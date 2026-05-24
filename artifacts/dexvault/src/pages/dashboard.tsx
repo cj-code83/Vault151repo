@@ -89,15 +89,19 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover-elevate transition-all border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Cards</CardTitle>
-            <Library className="w-4 h-4 text-primary" />
+            <CardTitle className="text-sm font-medium text-red-600 dark:text-red-500">Total Cards</CardTitle>
+            <Library className="w-4 h-4 text-red-600 dark:text-red-500" />
           </CardHeader>
           <CardContent>
             {collectionLoading ? (
               <div className="h-8 w-16 bg-muted rounded animate-pulse" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-total-cards">{totalCards}</div>
+                <Link href="/collection">
+                  <div className="text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-total-cards">
+                    {totalCards}
+                  </div>
+                </Link>
                 <p className="text-xs text-muted-foreground mt-1">{uniqueCards} unique prints</p>
               </>
             )}
@@ -106,8 +110,8 @@ export default function Dashboard() {
 
         <Card className="hover-elevate transition-all border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Estimated Value</CardTitle>
-            <TrendingUp className="w-4 h-4 text-green-500" />
+            <CardTitle className="text-sm font-medium text-green-600 dark:text-green-500">Estimated Value</CardTitle>
+            <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-500" />
           </CardHeader>
           <CardContent>
             {valueLoading ? (
@@ -127,8 +131,8 @@ export default function Dashboard() {
 
         <Card className="hover-elevate transition-all border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Favourites</CardTitle>
-            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500/20" />
+            <CardTitle className="text-sm font-medium text-yellow-600 dark:text-yellow-500">Favourites</CardTitle>
+            <Star className="w-4 h-4 text-yellow-600 dark:text-yellow-500 fill-yellow-500/20" />
           </CardHeader>
           <CardContent>
             {collectionLoading ? (
@@ -136,10 +140,7 @@ export default function Dashboard() {
             ) : (
               <>
                 <Link href="/collection?tab=favourites">
-                  <div
-                    className="text-2xl font-bold text-primary hover:underline cursor-pointer w-fit"
-                    data-testid="text-favorite-count"
-                  >
+                  <div className="text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-favorite-count">
                     {favoriteCards}
                   </div>
                 </Link>
@@ -151,15 +152,19 @@ export default function Dashboard() {
 
         <Card className="hover-elevate transition-all border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Wishlist</CardTitle>
-            <Target className="w-4 h-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-500">Wishlist</CardTitle>
+            <Target className="w-4 h-4 text-blue-600 dark:text-blue-500" />
           </CardHeader>
           <CardContent>
             {collectionLoading ? (
               <div className="h-8 w-8 bg-muted rounded animate-pulse" />
             ) : (
               <>
-                <div className="text-2xl font-bold" data-testid="text-wishlist-count">{wishlistedCards}</div>
+                <Link href="/collection?tab=wishlist">
+                  <div className="text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-wishlist-count">
+                    {wishlistedCards}
+                  </div>
+                </Link>
                 <p className="text-xs text-muted-foreground mt-1">Cards you're hunting</p>
               </>
             )}

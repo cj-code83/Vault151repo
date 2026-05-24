@@ -10,28 +10,24 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-function DexVaultLogo({ size = 32 }: { size?: number }) {
+function Vault151Logo({ size = 32 }: { size?: number }) {
   return (
-    <svg
+    <img
+      src="/vault151-logo.png"
+      alt="Vault151 logo"
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="DexVault logo"
-    >
-      <rect width="32" height="32" rx="7" fill="#CC0000" />
-      <rect x="6" y="5" width="14" height="19" rx="2.5" fill="#3B4CCA" fillOpacity="0.85" />
-      <rect x="6" y="5" width="14" height="19" rx="2.5" stroke="white" strokeOpacity="0.5" strokeWidth="1.2" />
-      <rect x="9" y="8" width="8" height="1.5" rx="0.75" fill="white" fillOpacity="0.8" />
-      <rect x="9" y="11" width="8" height="1.5" rx="0.75" fill="white" fillOpacity="0.8" />
-      <rect x="9" y="14" width="5" height="1.5" rx="0.75" fill="white" fillOpacity="0.8" />
-      <rect x="12" y="10" width="14" height="19" rx="2.5" fill="#FFCB05" />
-      <rect x="12" y="10" width="14" height="19" rx="2.5" stroke="white" strokeOpacity="0.5" strokeWidth="1.2" />
-      <circle cx="19" cy="19.5" r="4" fill="white" fillOpacity="0.15" stroke="white" strokeOpacity="0.7" strokeWidth="1" />
-      <path d="M15 19.5h8" stroke="white" strokeOpacity="0.9" strokeWidth="1" />
-      <circle cx="19" cy="19.5" r="1.5" fill="white" />
-    </svg>
+      className="rounded-xl object-contain"
+    />
+  );
+}
+
+function Vault151Wordmark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`font-bold tracking-tight ${className}`}>
+      <span className="text-foreground">Vault</span>
+      <span className="text-red-600 dark:text-red-500">151</span>
+    </span>
   );
 }
 
@@ -62,8 +58,8 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-sidebar px-4 py-6 shrink-0 h-screen sticky top-0">
         <div className="flex items-center gap-2.5 mb-8 px-2">
-          <DexVaultLogo size={32} />
-          <span className="font-bold text-xl tracking-tight text-sidebar-foreground">DexVault</span>
+          <Vault151Logo size={32} />
+          <Vault151Wordmark className="text-xl" />
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -104,8 +100,8 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1 flex flex-col min-w-0 pb-[72px] md:pb-0 overflow-x-hidden">
         <header className="md:hidden flex items-center justify-between px-4 h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-2">
-            <DexVaultLogo size={28} />
-            <span className="font-bold text-lg tracking-tight">DexVault</span>
+            <Vault151Logo size={28} />
+            <Vault151Wordmark className="text-lg" />
           </div>
           <Button
             variant="ghost"
