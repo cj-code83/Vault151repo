@@ -23,13 +23,13 @@ export default function Landing() {
         <div className="max-w-xl">
           <div className="flex items-center gap-3 mb-8">
             <svg width="44" height="44" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="DexVault logo">
-              <rect width="32" height="32" rx="7" fill="hsl(262.1 83.3% 57.8%)" />
-              <rect x="6" y="5" width="14" height="19" rx="2.5" fill="white" fillOpacity="0.18" />
-              <rect x="6" y="5" width="14" height="19" rx="2.5" stroke="white" strokeOpacity="0.7" strokeWidth="1.2" />
+              <rect width="32" height="32" rx="7" fill="#CC0000" />
+              <rect x="6" y="5" width="14" height="19" rx="2.5" fill="#3B4CCA" fillOpacity="0.85" />
+              <rect x="6" y="5" width="14" height="19" rx="2.5" stroke="white" strokeOpacity="0.5" strokeWidth="1.2" />
               <rect x="9" y="8" width="8" height="1.5" rx="0.75" fill="white" fillOpacity="0.8" />
               <rect x="9" y="11" width="8" height="1.5" rx="0.75" fill="white" fillOpacity="0.8" />
               <rect x="9" y="14" width="5" height="1.5" rx="0.75" fill="white" fillOpacity="0.8" />
-              <rect x="12" y="10" width="14" height="19" rx="2.5" fill="hsl(262.1 83.3% 47%)" />
+              <rect x="12" y="10" width="14" height="19" rx="2.5" fill="#FFCB05" />
               <rect x="12" y="10" width="14" height="19" rx="2.5" stroke="white" strokeOpacity="0.5" strokeWidth="1.2" />
               <circle cx="19" cy="19.5" r="4" fill="white" fillOpacity="0.15" stroke="white" strokeOpacity="0.7" strokeWidth="1" />
               <path d="M15 19.5h8" stroke="white" strokeOpacity="0.9" strokeWidth="1" />

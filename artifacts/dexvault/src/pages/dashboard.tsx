@@ -1,5 +1,6 @@
 import { useAuth } from '@/hooks/use-auth';
 import { useCollectionStore } from '@/store/collectionStore';
+import { useCollectionValue } from '@/hooks/use-collection-value';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Library, Star, Target, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Redirect, Link } from 'wouter';
@@ -36,6 +37,7 @@ create policy "Users manage own profile" on profiles
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { collectionCards, loading: collectionLoading, dbSetupRequired } = useCollectionStore();
+  const { totalValue, isLoading: valueLoading, hasData } = useCollectionValue(collectionCards);
 
   if (authLoading) {
     return (
@@ -109,8 +111,18 @@ export default function Dashboard() {
             <TrendingUp className="w-4 h-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Market data coming soon</p>
+            {valueLoading ? (
+              <div className="h-8 w-24 bg-muted rounded animate-pulse" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold font-mono" data-testid="text-collection-value">
+                  {hasData ? `$${totalValue.toFixed(2)}` : '--'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {hasData ? 'TCGPlayer market price' : 'No price data available'}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
