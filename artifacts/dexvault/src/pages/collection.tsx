@@ -3,8 +3,9 @@ import { useAuth } from '@/hooks/use-auth';
 import { useCollectionStore } from '@/store/collectionStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
-import { searchCards } from '@/services/pokemonTcg';
+import { getCardsByIds } from '@/services/pokemonTcg';
 import { CardItem } from '@/components/card-item';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Collection() {
   const { user } = useAuth();
@@ -14,19 +15,20 @@ export default function Collection() {
   const ownedCards = Object.values(collectionCards).filter(c => c.quantity > 0);
   const wishlistedCards = Object.values(collectionCards).filter(c => c.isWishlisted && c.quantity === 0);
 
-  // Fetch details for owned cards (batching would be better, but doing generic search for simplicity here)
   const ownedIds = ownedCards.map(c => c.cardId);
   const wishlistIds = wishlistedCards.map(c => c.cardId);
 
-  const queryParam = activeTab === 'owned' 
-    ? (ownedIds.length ? `id:(${ownedIds.join(' OR ')})` : 'id:none')
-    : (wishlistIds.length ? `id:(${wishlistIds.join(' OR ')})` : 'id:none');
+  const activeIds = activeTab === 'owned' ? ownedIds : wishlistIds;
+  const sortedKey = [...activeIds].sort().join(',');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['collection', activeTab, queryParam],
-    queryFn: () => searchCards({ name: '', pageSize: 100 }), // In a real app we'd query by IDs
-    enabled: ownedIds.length > 0 || wishlistIds.length > 0,
+  const { data: cards, isLoading } = useQuery({
+    queryKey: ['collection-cards', activeTab, sortedKey],
+    queryFn: () => getCardsByIds(activeIds),
+    enabled: activeIds.length > 0,
+    staleTime: 1000 * 60 * 5,
   });
+
+  const displayCards = cards ?? [];
 
   return (
     <div className="space-y-6">
@@ -40,28 +42,43 @@ export default function Collection() {
           <TabsTrigger value="owned">Owned ({ownedCards.length})</TabsTrigger>
           <TabsTrigger value="wishlist">Wishlist ({wishlistedCards.length})</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="owned" className="mt-6">
           {ownedCards.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
               Your collection is empty. Search for cards to add them.
             </div>
+          ) : isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {ownedIds.map((id) => (
+                <Skeleton key={id} className="aspect-[63/88] rounded-lg" />
+              ))}
+            </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              {/* Note: Full implementation would render CardItems using fetched card details */}
-              Loading collection data...
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {displayCards.map((card) => (
+                <CardItem key={card.id} card={card} />
+              ))}
             </div>
           )}
         </TabsContent>
-        
+
         <TabsContent value="wishlist" className="mt-6">
           {wishlistedCards.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
               Your wishlist is empty.
             </div>
+          ) : isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {wishlistIds.map((id) => (
+                <Skeleton key={id} className="aspect-[63/88] rounded-lg" />
+              ))}
+            </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              Loading wishlist data...
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+              {displayCards.map((card) => (
+                <CardItem key={card.id} card={card} />
+              ))}
             </div>
           )}
         </TabsContent>

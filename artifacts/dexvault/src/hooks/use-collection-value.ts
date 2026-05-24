@@ -1,31 +1,24 @@
 import { useQueries } from '@tanstack/react-query';
-import { getCardsByIds } from '@/services/pokemonTcg';
+import { getCard } from '@/services/pokemonTcg';
 import { CollectionCard } from '@/types/pokemon';
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-    arr.slice(i * size, i * size + size)
-  );
-}
 
 export function useCollectionValue(collectionCards: Record<string, CollectionCard>) {
   const ownedCards = Object.values(collectionCards).filter(
     (c) => c.quantity > 0 && !c.isWishlisted
   );
   const cardIds = ownedCards.map((c) => c.cardId);
-  const batches = chunk(cardIds, 20);
 
   const queries = useQueries({
-    queries: batches.map((batch) => ({
-      queryKey: ['card-prices', [...batch].sort().join(',')],
-      queryFn: () => getCardsByIds(batch),
+    queries: cardIds.map((id) => ({
+      queryKey: ['card-price', id],
+      queryFn: () => getCard(id),
       staleTime: 1000 * 60 * 60 * 24,
-      enabled: batch.length > 0,
+      enabled: true,
     })),
   });
 
-  const isLoading = cardIds.length > 0 && queries.some((q) => q.isLoading);
-  const allCards = queries.flatMap((q) => q.data ?? []);
+  const isLoading = cardIds.length > 0 && queries.some((q) => q.isPending);
+  const allCards = queries.flatMap((q) => (q.data ? [q.data] : []));
 
   let totalValue = 0;
   for (const card of allCards) {
