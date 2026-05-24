@@ -1,34 +1,78 @@
-import { useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useState, useEffect } from 'react';
 import { useCollectionStore } from '@/store/collectionStore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuery } from '@tanstack/react-query';
 import { getCardsByIds } from '@/services/pokemonTcg';
 import { CardItem } from '@/components/card-item';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSearch } from 'wouter';
 
-export default function Collection() {
-  const { user } = useAuth();
-  const { collectionCards } = useCollectionStore();
-  const [activeTab, setActiveTab] = useState('owned');
-
-  const ownedCards = Object.values(collectionCards).filter(c => c.quantity > 0);
-  const wishlistedCards = Object.values(collectionCards).filter(c => c.isWishlisted && c.quantity === 0);
-
-  const ownedIds = ownedCards.map(c => c.cardId);
-  const wishlistIds = wishlistedCards.map(c => c.cardId);
-
-  const activeIds = activeTab === 'owned' ? ownedIds : wishlistIds;
-  const sortedKey = [...activeIds].sort().join(',');
-
+function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
+  const sortedKey = [...ids].sort().join(',');
   const { data: cards, isLoading } = useQuery({
     queryKey: ['collection-cards', activeTab, sortedKey],
-    queryFn: () => getCardsByIds(activeIds),
-    enabled: activeIds.length > 0,
+    queryFn: () => getCardsByIds(ids),
+    enabled: ids.length > 0,
     staleTime: 1000 * 60 * 5,
   });
 
-  const displayCards = cards ?? [];
+  if (ids.length === 0) return null;
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {ids.map((id) => (
+          <Skeleton key={id} className="aspect-[63/88] rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      {(cards ?? []).map((card) => (
+        <CardItem key={card.id} card={card} />
+      ))}
+    </div>
+  );
+}
+
+export default function Collection() {
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const tabParam = params.get('tab');
+
+  const validTabs = ['owned', 'wishlist', 'favourites'];
+  const initialTab = validTabs.includes(tabParam ?? '') ? tabParam! : 'owned';
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (validTabs.includes(tabParam ?? '')) {
+      setActiveTab(tabParam!);
+    }
+  }, [tabParam]);
+
+  const { collectionCards } = useCollectionStore();
+
+  const ownedCards = Object.values(collectionCards).filter(c => c.quantity > 0);
+  const wishlistedCards = Object.values(collectionCards).filter(c => c.isWishlisted && c.quantity === 0);
+  const favouritedCards = Object.values(collectionCards).filter(c => c.isFavorite);
+
+  const ownedIds = ownedCards.map(c => c.cardId);
+  const wishlistIds = wishlistedCards.map(c => c.cardId);
+  const favouriteIds = favouritedCards.map(c => c.cardId);
+
+  const emptyMessage: Record<string, string> = {
+    owned: 'Your collection is empty. Search for cards to add them.',
+    wishlist: 'Your wishlist is empty.',
+    favourites: 'No favourited cards yet. Star a card from its detail page.',
+  };
+
+  const activeIds =
+    activeTab === 'owned' ? ownedIds :
+    activeTab === 'wishlist' ? wishlistIds :
+    favouriteIds;
 
   return (
     <div className="space-y-6">
@@ -38,50 +82,30 @@ export default function Collection() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="owned">Owned ({ownedCards.length})</TabsTrigger>
           <TabsTrigger value="wishlist">Wishlist ({wishlistedCards.length})</TabsTrigger>
+          <TabsTrigger value="favourites">Favourites ({favouritedCards.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="owned" className="mt-6">
-          {ownedCards.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
-              Your collection is empty. Search for cards to add them.
-            </div>
-          ) : isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {ownedIds.map((id) => (
-                <Skeleton key={id} className="aspect-[63/88] rounded-lg" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {displayCards.map((card) => (
-                <CardItem key={card.id} card={card} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+        {(['owned', 'wishlist', 'favourites'] as const).map((tab) => {
+          const ids =
+            tab === 'owned' ? ownedIds :
+            tab === 'wishlist' ? wishlistIds :
+            favouriteIds;
 
-        <TabsContent value="wishlist" className="mt-6">
-          {wishlistedCards.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
-              Your wishlist is empty.
-            </div>
-          ) : isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {wishlistIds.map((id) => (
-                <Skeleton key={id} className="aspect-[63/88] rounded-lg" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {displayCards.map((card) => (
-                <CardItem key={card.id} card={card} />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+          return (
+            <TabsContent key={tab} value={tab} className="mt-6">
+              {ids.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
+                  {emptyMessage[tab]}
+                </div>
+              ) : (
+                <CardGrid ids={ids} activeTab={tab} />
+              )}
+            </TabsContent>
+          );
+        })}
       </Tabs>
     </div>
   );
