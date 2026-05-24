@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
+import logoUrl from '@assets/vault151_logo_outline_1779626443797.png';
 import { Home, Search, Layers, Library, User, Moon, Sun, AlertTriangle } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { Button } from './ui/button';
@@ -13,11 +14,11 @@ interface LayoutProps {
 function Vault151Logo({ size = 32 }: { size?: number }) {
   return (
     <img
-      src="/vault151-logo.png"
+      src={logoUrl}
       alt="Vault151 logo"
       width={size}
       height={size}
-      className="rounded-xl object-contain"
+      className="object-contain"
     />
   );
 }

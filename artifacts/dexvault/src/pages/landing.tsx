@@ -1,6 +1,7 @@
 import { useAuth } from '@/hooks/use-auth';
 import { AuthForm } from '@/components/auth-form';
 import { Redirect } from 'wouter';
+import logoUrl from '@assets/vault151_logo_outline_1779626443797.png';
 
 const SHOWCASE_CARDS = [
   {
@@ -80,11 +81,11 @@ export default function Landing() {
         <div className="max-w-xl">
           <div className="flex items-center gap-3 mb-8">
             <img
-              src="/vault151-logo.png"
+              src={logoUrl}
               alt="Vault151 logo"
               width={44}
               height={44}
-              className="object-contain"
+              className="object-contain drop-shadow-sm"
             />
             <span className="font-bold text-3xl tracking-tight">
               <span className="text-foreground">Vault</span>
