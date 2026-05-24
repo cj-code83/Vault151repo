@@ -37,7 +37,7 @@ create policy "Users manage own profile" on profiles
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { collectionCards, loading: collectionLoading, dbSetupRequired } = useCollectionStore();
-  const { totalValue, isLoading: valueLoading, hasData } = useCollectionValue(collectionCards);
+  const { totalValue, isLoading: valueLoading, hasData } = useCollectionValue();
 
   if (authLoading) {
     return (

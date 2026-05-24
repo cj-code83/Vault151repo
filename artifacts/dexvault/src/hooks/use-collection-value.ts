@@ -1,8 +1,10 @@
 import { useQueries } from '@tanstack/react-query';
 import { getCard } from '@/services/pokemonTcg';
-import { CollectionCard } from '@/types/pokemon';
+import { useCollectionStore } from '@/store/collectionStore';
 
-export function useCollectionValue(collectionCards: Record<string, CollectionCard>) {
+export function useCollectionValue() {
+  const collectionCards = useCollectionStore((s) => s.collectionCards);
+
   const ownedCards = Object.values(collectionCards).filter(
     (c) => c.quantity > 0 && !c.isWishlisted
   );
@@ -13,7 +15,6 @@ export function useCollectionValue(collectionCards: Record<string, CollectionCar
       queryKey: ['card-price', id],
       queryFn: () => getCard(id),
       staleTime: 1000 * 60 * 60 * 24,
-      enabled: true,
     })),
   });
 

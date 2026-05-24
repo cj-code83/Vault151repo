@@ -49,10 +49,11 @@ export default function SetDetail() {
     setAllCards(cards);
   }, [page1, page2]);
 
+  const setCardIds = new Set(allCards.map((c) => c.id));
   const owned = Object.values(collectionCards).filter(
-    (c) => c.cardId.startsWith(setId + '-')
+    (c) => c.quantity > 0 && setCardIds.has(c.cardId)
   ).length;
-  const total = set?.printedTotal || set?.total || 0;
+  const total = set?.printedTotal || set?.total || allCards.length || 0;
   const pct = total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0;
 
   return (
