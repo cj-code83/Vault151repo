@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import NotFound from "@/pages/not-found";
@@ -15,29 +17,45 @@ import Collection from "@/pages/collection";
 import Profile from "@/pages/profile";
 import CardDetail from "@/pages/card-detail";
 import { useAuth } from "@/hooks/use-auth";
+import { useCollectionStore } from "@/store/collectionStore";
 
 const queryClient = new QueryClient();
 
-// Protected route component
+function CollectionInitializer() {
+  const { user } = useAuth();
+  const fetchCollection = useCollectionStore((s) => s.fetchCollection);
+
+  useEffect(() => {
+    if (user) {
+      fetchCollection(user.id);
+    }
+  }, [user?.id, fetchCollection]);
+
+  return null;
+}
+
 const ProtectedRoute = ({ component: Component, ...rest }: any) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-    </div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
-  
+
   if (!user) {
     return <Redirect to="/" />;
   }
-  
+
   return <Component {...rest} />;
 };
 
 function Router() {
   return (
     <Layout>
+      <CollectionInitializer />
       <Switch>
         <Route path="/" component={Landing} />
         <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
@@ -62,6 +80,7 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
+          <SonnerToaster richColors position="bottom-right" />
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>

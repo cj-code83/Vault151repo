@@ -1,10 +1,12 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import { CollectionCard, PokemonCard } from '../types/pokemon';
 import { supabase } from '../lib/supabase';
 
 interface CollectionState {
   collectionCards: Record<string, CollectionCard>;
   loading: boolean;
+  dbSetupRequired: boolean;
   fetchCollection: (userId: string) => Promise<void>;
   addCard: (card: PokemonCard, userId: string) => Promise<void>;
   removeCard: (cardId: string, userId: string) => Promise<void>;
@@ -14,9 +16,18 @@ interface CollectionState {
   updateCondition: (cardId: string, condition: string, userId: string) => Promise<void>;
 }
 
+function isTableMissingError(error: { code?: string; message?: string }) {
+  return (
+    error.code === '42P01' ||
+    (error.message ?? '').includes('relation') ||
+    (error.message ?? '').includes('does not exist')
+  );
+}
+
 export const useCollectionStore = create<CollectionState>((set, get) => ({
   collectionCards: {},
   loading: false,
+  dbSetupRequired: false,
 
   fetchCollection: async (userId: string) => {
     set({ loading: true });
@@ -24,10 +35,20 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .from('collection_cards')
       .select('*')
       .eq('user_id', userId);
-    
-    if (!error && data) {
+
+    if (error) {
+      set({ loading: false });
+      if (isTableMissingError(error)) {
+        set({ dbSetupRequired: true });
+      } else {
+        toast.error('Could not load collection', { description: error.message });
+      }
+      return;
+    }
+
+    if (data) {
       const cardsRecord: Record<string, CollectionCard> = {};
-      data.forEach(item => {
+      data.forEach((item) => {
         cardsRecord[item.card_id] = {
           id: item.id,
           userId: item.user_id,
@@ -37,19 +58,16 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
           isFavorite: item.is_favorite,
           isWishlisted: item.is_wishlisted,
           notes: item.notes,
-          createdAt: item.created_at
+          createdAt: item.created_at,
         };
       });
-      set({ collectionCards: cardsRecord, loading: false });
-    } else {
-      set({ loading: false });
+      set({ collectionCards: cardsRecord, loading: false, dbSetupRequired: false });
     }
   },
 
   addCard: async (card: PokemonCard, userId: string) => {
     const existing = get().collectionCards[card.id];
     if (existing) {
-      // Increment quantity
       get().updateQuantity(card.id, existing.quantity + 1, userId);
       return;
     }
@@ -63,7 +81,6 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       is_wishlisted: false,
     };
 
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     const optimisticCard: CollectionCard = {
       id: tempId,
@@ -73,11 +90,11 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       condition: 'Near Mint',
       isFavorite: false,
       isWishlisted: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     set((state) => ({
-      collectionCards: { ...state.collectionCards, [card.id]: optimisticCard }
+      collectionCards: { ...state.collectionCards, [card.id]: optimisticCard },
     }));
 
     const { data, error } = await supabase
@@ -86,23 +103,30 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .select()
       .single();
 
-    if (!error && data) {
-      set((state) => ({
-        collectionCards: {
-          ...state.collectionCards,
-          [card.id]: {
-            ...optimisticCard,
-            id: data.id,
-          }
-        }
-      }));
-    } else {
-      // Revert on error
+    if (error) {
       set((state) => {
         const next = { ...state.collectionCards };
         delete next[card.id];
         return { collectionCards: next };
       });
+      if (isTableMissingError(error)) {
+        set({ dbSetupRequired: true });
+        toast.error('Database not set up', {
+          description: 'Run the SQL setup in your Supabase project — see the Profile page.',
+        });
+      } else {
+        toast.error('Could not add card', { description: error.message });
+      }
+      return;
+    }
+
+    if (data) {
+      set((state) => ({
+        collectionCards: {
+          ...state.collectionCards,
+          [card.id]: { ...optimisticCard, id: data.id },
+        },
+      }));
     }
   },
 
@@ -110,7 +134,6 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     const existing = get().collectionCards[cardId];
     if (!existing) return;
 
-    // Optimistic
     set((state) => {
       const next = { ...state.collectionCards };
       delete next[cardId];
@@ -124,10 +147,10 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .eq('card_id', cardId);
 
     if (error) {
-      // Revert
       set((state) => ({
-        collectionCards: { ...state.collectionCards, [cardId]: existing }
+        collectionCards: { ...state.collectionCards, [cardId]: existing },
       }));
+      toast.error('Could not remove card', { description: error.message });
     }
   },
 
@@ -137,12 +160,11 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
 
     const newValue = !existing.isFavorite;
 
-    // Optimistic
     set((state) => ({
       collectionCards: {
         ...state.collectionCards,
-        [cardId]: { ...existing, isFavorite: newValue }
-      }
+        [cardId]: { ...existing, isFavorite: newValue },
+      },
     }));
 
     const { error } = await supabase
@@ -152,20 +174,20 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .eq('card_id', cardId);
 
     if (error) {
-      // Revert
       set((state) => ({
         collectionCards: {
           ...state.collectionCards,
-          [cardId]: { ...existing, isFavorite: !newValue }
-        }
+          [cardId]: { ...existing, isFavorite: !newValue },
+        },
       }));
+      toast.error('Could not update favorite', { description: error.message });
     }
   },
 
   toggleWishlist: async (cardId: string, userId: string) => {
     const existing = get().collectionCards[cardId];
+
     if (!existing) {
-      // Create as wishlisted
       const newEntry = {
         user_id: userId,
         card_id: cardId,
@@ -184,11 +206,11 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         condition: 'Near Mint',
         isFavorite: false,
         isWishlisted: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
 
       set((state) => ({
-        collectionCards: { ...state.collectionCards, [cardId]: optimisticCard }
+        collectionCards: { ...state.collectionCards, [cardId]: optimisticCard },
       }));
 
       const { data, error } = await supabase
@@ -197,31 +219,38 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .select()
         .single();
 
-      if (!error && data) {
-        set((state) => ({
-          collectionCards: {
-            ...state.collectionCards,
-            [cardId]: { ...optimisticCard, id: data.id }
-          }
-        }));
-      } else {
+      if (error) {
         set((state) => {
           const next = { ...state.collectionCards };
           delete next[cardId];
           return { collectionCards: next };
         });
+        if (isTableMissingError(error)) {
+          set({ dbSetupRequired: true });
+          toast.error('Database not set up', {
+            description: 'Run the SQL setup in your Supabase project — see the Profile page.',
+          });
+        } else {
+          toast.error('Could not add to wishlist', { description: error.message });
+        }
+      } else if (data) {
+        set((state) => ({
+          collectionCards: {
+            ...state.collectionCards,
+            [cardId]: { ...optimisticCard, id: data.id },
+          },
+        }));
       }
       return;
     }
 
     const newValue = !existing.isWishlisted;
 
-    // Optimistic
     set((state) => ({
       collectionCards: {
         ...state.collectionCards,
-        [cardId]: { ...existing, isWishlisted: newValue }
-      }
+        [cardId]: { ...existing, isWishlisted: newValue },
+      },
     }));
 
     const { error } = await supabase
@@ -231,13 +260,13 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .eq('card_id', cardId);
 
     if (error) {
-      // Revert
       set((state) => ({
         collectionCards: {
           ...state.collectionCards,
-          [cardId]: { ...existing, isWishlisted: !newValue }
-        }
+          [cardId]: { ...existing, isWishlisted: !newValue },
+        },
       }));
+      toast.error('Could not update wishlist', { description: error.message });
     }
   },
 
@@ -249,12 +278,11 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       return get().removeCard(cardId, userId);
     }
 
-    // Optimistic
     set((state) => ({
       collectionCards: {
         ...state.collectionCards,
-        [cardId]: { ...existing, quantity }
-      }
+        [cardId]: { ...existing, quantity },
+      },
     }));
 
     const { error } = await supabase
@@ -264,13 +292,13 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .eq('card_id', cardId);
 
     if (error) {
-      // Revert
       set((state) => ({
         collectionCards: {
           ...state.collectionCards,
-          [cardId]: { ...existing, quantity: existing.quantity }
-        }
+          [cardId]: { ...existing, quantity: existing.quantity },
+        },
       }));
+      toast.error('Could not update quantity', { description: error.message });
     }
   },
 
@@ -278,12 +306,11 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     const existing = get().collectionCards[cardId];
     if (!existing) return;
 
-    // Optimistic
     set((state) => ({
       collectionCards: {
         ...state.collectionCards,
-        [cardId]: { ...existing, condition }
-      }
+        [cardId]: { ...existing, condition },
+      },
     }));
 
     const { error } = await supabase
@@ -293,13 +320,13 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .eq('card_id', cardId);
 
     if (error) {
-      // Revert
       set((state) => ({
         collectionCards: {
           ...state.collectionCards,
-          [cardId]: { ...existing, condition: existing.condition }
-        }
+          [cardId]: { ...existing, condition: existing.condition },
+        },
       }));
+      toast.error('Could not update condition', { description: error.message });
     }
-  }
+  },
 }));
