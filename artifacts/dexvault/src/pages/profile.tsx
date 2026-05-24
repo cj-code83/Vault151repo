@@ -82,66 +82,6 @@ export default function Profile() {
           </Button>
         </CardContent>
       </Card>
-
-      <Card className={`border-2 ${dbSetupRequired ? 'border-amber-400 dark:border-amber-600' : 'border-border'}`}>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Database Setup
-                {dbSetupRequired && (
-                  <span className="text-xs font-semibold bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
-                    Required
-                  </span>
-                )}
-              </CardTitle>
-              <CardDescription className="mt-1.5">
-                Run this SQL once in your{' '}
-                <a
-                  href="https://supabase.com/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline inline-flex items-center gap-0.5"
-                >
-                  Supabase SQL Editor <ExternalLink className="w-3 h-3" />
-                </a>
-                {' '}to create the tables DexVault needs.
-              </CardDescription>
-            </div>
-            <Button
-              variant={copied ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={handleCopy}
-              className="shrink-0"
-              data-testid="button-copy-sql"
-            >
-              {copied ? (
-                <><Check className="w-4 h-4 mr-1.5 text-green-500" /> Copied</>
-              ) : (
-                <><Copy className="w-4 h-4 mr-1.5" /> Copy SQL</>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <pre
-            id="sql-schema-text"
-            className="bg-muted rounded-lg p-4 overflow-x-auto text-xs font-mono leading-relaxed text-foreground/80 select-all border border-border"
-          >
-            {SQL_SCHEMA}
-          </pre>
-          {dbSetupRequired && (
-            <div className="mt-4 flex items-center gap-3">
-              <p className="text-sm text-amber-700 dark:text-amber-400 flex-1">
-                After running the SQL, click Retry to verify the setup.
-              </p>
-              <Button size="sm" onClick={handleRetry} data-testid="button-retry-setup">
-                Retry
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
