@@ -1,9 +1,10 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Home, Search, Layers, Library, User, Moon, Sun } from 'lucide-react';
+import { Home, Search, Layers, Library, User, Moon, Sun, AlertTriangle } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { Button } from './ui/button';
 import { useAuth } from '@/hooks/use-auth';
+import { useCollectionStore } from '@/store/collectionStore';
 
 interface LayoutProps {
   children: ReactNode;
@@ -38,6 +39,7 @@ export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const dbSetupRequired = useCollectionStore((s) => s.dbSetupRequired);
 
   const isDark = theme === 'dark';
 
@@ -114,6 +116,22 @@ export function Layout({ children }: LayoutProps) {
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
         </header>
+
+        {dbSetupRequired && (
+          <div className="bg-amber-50 dark:bg-amber-950/50 border-b border-amber-300 dark:border-amber-700 px-4 py-3 flex items-center gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+              Database setup required — your collection cannot be saved yet.
+            </p>
+            <Link
+              href="/profile"
+              className="text-sm font-semibold text-amber-700 dark:text-amber-300 underline underline-offset-2 shrink-0"
+              data-testid="link-setup-banner"
+            >
+              View Setup SQL
+            </Link>
+          </div>
+        )}
 
         <div className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8">
           {children}
