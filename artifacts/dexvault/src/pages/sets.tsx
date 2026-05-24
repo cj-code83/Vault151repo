@@ -1,49 +1,135 @@
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { getSets } from '@/services/pokemonTcg';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
+import { useCollectionStore } from '@/store/collectionStore';
+import { PokemonSet } from '@/types/pokemon';
+
+const ERAS: { label: string; series: string[] }[] = [
+  { label: 'Scarlet & Violet', series: ['Scarlet & Violet'] },
+  { label: 'Sword & Shield', series: ['Sword & Shield'] },
+  { label: 'Sun & Moon', series: ['Sun & Moon'] },
+  { label: 'XY', series: ['XY'] },
+  { label: 'Black & White', series: ['Black & White'] },
+  { label: 'HeartGold & SoulSilver', series: ['HeartGold & SoulSilver'] },
+  { label: 'Diamond & Pearl', series: ['Diamond & Pearl', 'Platinum'] },
+  { label: 'EX Series', series: ['EX'] },
+  { label: 'Wizards of the Coast', series: ['Base', 'Jungle', 'Fossil', 'Team Rocket', 'Gym', 'Neo', 'Legendary Collection', 'e-Card'] },
+  { label: 'Other', series: [] },
+];
+
+function getCompletion(set: PokemonSet, collectionCards: Record<string, { cardId: string }>) {
+  const owned = Object.values(collectionCards).filter(
+    (c) => c.cardId.startsWith(set.id + '-')
+  ).length;
+  const total = set.printedTotal || set.total;
+  return { owned, total, pct: total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0 };
+}
 
 export default function Sets() {
+  const [, setLocation] = useLocation();
   const { data: sets, isLoading, isError } = useQuery({
     queryKey: ['sets'],
     queryFn: getSets,
-    staleTime: 3600000, // 1 hour
+    staleTime: 3600000,
   });
+  const { collectionCards } = useCollectionStore();
+
+  const groupedSets: { era: string; sets: PokemonSet[] }[] = [];
+  if (sets) {
+    const assigned = new Set<string>();
+    for (const era of ERAS) {
+      if (era.series.length === 0) continue;
+      const matched = sets.filter(
+        (s) => era.series.some((ser) => s.series.toLowerCase().includes(ser.toLowerCase())) && !assigned.has(s.id)
+      );
+      matched.forEach((s) => assigned.add(s.id));
+      if (matched.length) groupedSets.push({ era: era.label, sets: matched });
+    }
+    const other = sets.filter((s) => !assigned.has(s.id));
+    if (other.length) groupedSets.push({ era: 'Other', sets: other });
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Sets</h1>
-        <p className="text-muted-foreground">Browse cards by set and era.</p>
+        <h1 className="text-3xl font-bold tracking-tight mb-1">Sets</h1>
+        <p className="text-muted-foreground">Browse every era of English Pokémon TCG.</p>
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 12 }).map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
-          ))}
-        </div>
-      ) : isError ? (
-        <div className="text-destructive">Failed to load sets</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {sets?.map((set) => (
-            <Card key={set.id} className="hover-elevate cursor-pointer border-border transition-all">
-              <CardContent className="p-4 flex items-center gap-4 h-full">
-                <div className="w-16 h-16 shrink-0 flex items-center justify-center">
-                  <img src={set.images.symbol} alt={set.name} className="max-w-full max-h-full object-contain" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm truncate">{set.name}</h3>
-                  <p className="text-xs text-muted-foreground">{set.series}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{set.total} cards</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
       )}
+
+      {isError && (
+        <div className="text-destructive">Failed to load sets. Please try again.</div>
+      )}
+
+      {!isLoading && !isError && groupedSets.map(({ era, sets: eraSets }) => (
+        <section key={era}>
+          <h2 className="text-lg font-semibold mb-3 text-foreground/80 border-b border-border pb-2">{era}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {eraSets.map((set, i) => {
+              const { owned, total, pct } = getCompletion(set, collectionCards);
+              return (
+                <motion.div
+                  key={set.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: i * 0.03 }}
+                  className="group cursor-pointer rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden"
+                  onClick={() => setLocation(`/sets/${set.id}`)}
+                  data-testid={`set-card-${set.id}`}
+                >
+                  <div className="flex items-center gap-3 p-4">
+                    <div className="w-20 h-12 shrink-0 flex items-center justify-center">
+                      {set.images.logo ? (
+                        <img
+                          src={set.images.logo}
+                          alt={set.name}
+                          className="max-w-full max-h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = set.images.symbol;
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src={set.images.symbol}
+                          alt={set.name}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">{set.name}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{set.releaseDate} · {total} cards</p>
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">{owned} / {total} owned</span>
+                          <span className={`font-semibold ${pct === 100 ? 'text-green-500' : pct > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {pct}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Search from "@/pages/search";
 import Sets from "@/pages/sets";
+import SetDetail from "@/pages/set-detail";
 import Collection from "@/pages/collection";
 import Profile from "@/pages/profile";
 import CardDetail from "@/pages/card-detail";
@@ -42,6 +43,7 @@ function Router() {
         <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
         <Route path="/search"><ProtectedRoute component={Search} /></Route>
         <Route path="/sets"><ProtectedRoute component={Sets} /></Route>
+        <Route path="/sets/:id"><ProtectedRoute component={SetDetail} /></Route>
         <Route path="/collection"><ProtectedRoute component={Collection} /></Route>
         <Route path="/profile"><ProtectedRoute component={Profile} /></Route>
         <Route path="/card/:id"><ProtectedRoute component={CardDetail} /></Route>
@@ -53,7 +55,7 @@ function Router() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="dexvault-theme">
+    <ThemeProvider defaultTheme="light" storageKey="dexvault-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
