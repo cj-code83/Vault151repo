@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import logoUrl from '@assets/vault_151_LOGO_1779626964573.png';
+import logoUrl from '@assets/vault_151_LOGO_blackbg_1779627207357.png';
 import { Home, Search, Layers, Library, User, Moon, Sun, AlertTriangle } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { Button } from './ui/button';
