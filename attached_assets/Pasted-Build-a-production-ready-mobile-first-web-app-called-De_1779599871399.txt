@@ -1,0 +1,340 @@
+Build a production-ready mobile-first web app called “DexVault” — a premium Pokémon TCG collection tracking platform focused ONLY on English Pokémon cards.
+
+PRIMARY GOAL:
+Generate a CLEAN, SIMPLE, DEPLOYABLE Vite React frontend architecture that works immediately on Vercel using npm.
+
+IMPORTANT:
+DO NOT generate Express servers, backend runtimes, monorepos, pnpm workspaces, Next.js servers, or custom Node servers.
+
+This must be a frontend-only Vite SPA architecture.
+
+==================================================
+TECH STACK (STRICT)
+
+Use ONLY:
+
+• React 18
+• TypeScript
+• Vite
+• TailwindCSS
+• shadcn/ui
+• Framer Motion
+• React Router DOM
+• TanStack Query
+• Zustand
+• Supabase JS SDK
+• React Hook Form
+• Zod
+• Lucide React
+
+Package manager:
+• npm ONLY
+
+==================================================
+ARCHITECTURE REQUIREMENTS
+
+Generate this exact structure:
+
+/src
+/components
+/components/ui
+/pages
+/hooks
+/lib
+/services
+/store
+/types
+/assets
+/layouts
+/providers
+
+NO:
+• Express
+• app.listen()
+• server.ts
+• API runtime
+• monorepo
+• pnpm
+• backend folder
+• custom Vercel server config
+• server-side rendering
+• middleware servers
+
+==================================================
+DEPLOYMENT REQUIREMENTS
+
+The app MUST:
+
+• deploy directly to Vercel
+• use static frontend hosting
+• build successfully with:
+npm run build
+• use Vite SPA routing
+• include correct Vercel SPA rewrite config
+• contain no server dependencies
+
+Generate:
+• vite.config.ts
+• vercel.json
+• package.json
+• .env.example
+• README.md
+
+==================================================
+MOBILE RESPONSIVENESS IS CRITICAL
+
+The app must be fully mobile-first and optimized for phones before desktop.
+
+Prevent ALL horizontal scrolling on mobile.
+
+Requirements:
+• no sideways scrolling
+• all layouts must fit within viewport width
+• use responsive Tailwind breakpoints
+• use fluid grids
+• use max-width containers
+• use responsive typography scaling
+• use collapsible mobile navigation
+• card grids must shrink properly on small screens
+• images must use responsive sizing
+• use overflow-x-hidden where appropriate
+
+The mobile experience should feel like a premium native app while remaining a responsive website.
+
+Optimize specifically for:
+• iPhone
+• Samsung Galaxy devices
+• narrow mobile screens
+• touch interactions
+• thumb-friendly navigation
+
+Desktop should enhance the layout, not define it.
+
+==================================================
+THEME + DESIGN SYSTEM
+
+DEFAULT THEME:
+LIGHT MODE
+
+Also include:
+• dark mode toggle
+• persisted theme selection
+• system-theme detection
+
+DESIGN STYLE:
+Premium luxury collectible app aesthetic.
+
+Visual requirements:
+• soft off-white/light gray base
+• subtle gradients
+• glassmorphism
+• premium shadows
+• rounded-2xl cards
+• modern typography
+• smooth animations
+• floating search UI
+• clean spacing
+• elegant transitions
+• premium dashboard feel
+
+Dark mode should preserve the luxury aesthetic.
+
+Design inspiration:
+• Collectr
+• Dex
+• StockX
+• premium fintech dashboards
+
+==================================================
+CORE FEATURES (MVP ONLY)
+
+Implement these features FIRST:
+
+Authentication
+• Supabase email/password auth
+• Google login
+• persistent sessions
+• profile avatar
+• username
+Dashboard
+Display:
+• total cards owned
+• collection completion %
+• recent additions
+• favorite cards
+• wishlist count
+• collection value placeholder
+• charts/placeholders
+Set Browser
+Users can:
+• browse by era
+• browse by set
+• sort by release date
+• view completion %
+• grid/list toggle
+
+Include eras:
+• WOTC
+• EX
+• Diamond & Pearl
+• HGSS
+• Black & White
+• XY
+• Sun & Moon
+• Sword & Shield
+• Scarlet & Violet
+
+Card Search
+Use PokémonTCG API directly from frontend.
+
+Include:
+• instant search
+• debounced search
+• fuzzy matching
+• pagination
+• loading skeletons
+• error states
+• caching with TanStack Query
+
+Search by:
+• Pokémon name
+• set
+• rarity
+• type
+• illustrator
+• card number
+
+Collection Management
+Users can:
+• add/remove cards
+• track quantity
+• set condition
+• favorite cards
+• add notes
+• wishlist cards
+
+==================================================
+QUICK ADD FEATURE
+
+Add a “Quick Add” interaction directly from:
+• search results
+• set browsing pages
+
+Requirements:
+• one-tap add
+• optimistic UI updates
+• quantity increment/decrement
+• duplicate prevention
+• animated success feedback
+• mobile-friendly interaction
+
+==================================================
+CARD DETAIL PAGE
+
+Create premium card pages with:
+• HD card image
+• smooth hover animation
+• flip interaction
+• rarity badge
+• set info
+• related cards
+• add-to-collection CTA
+• wishlist CTA
+
+==================================================
+POKEMON API INTEGRATION
+
+Use:
+https://pokemontcg.io/
+
+Environment variable:
+VITE_POKEMON_TCG_API_KEY
+
+Implement:
+• API service layer
+• rate-limit handling
+• query caching
+• image optimization
+• graceful API failures
+
+==================================================
+SUPABASE
+
+Use frontend-only Supabase integration.
+
+Environment variables:
+• VITE_SUPABASE_URL
+• VITE_SUPABASE_ANON_KEY
+
+Use Supabase for:
+• auth
+• user collections
+• wishlist
+• profile storage
+
+Generate:
+• SQL schema
+• row-level security policies
+• setup instructions
+
+==================================================
+PERFORMANCE
+
+Optimize for:
+• mobile-first responsiveness
+• lazy loading
+• virtualized card grids
+• infinite scrolling
+• accessibility
+• fast page transitions
+• optimized image loading
+
+==================================================
+IMPORTANT UI REQUIREMENTS
+
+The app MUST feel:
+• polished
+• modern
+• smooth
+• premium
+• responsive
+• production-ready
+
+Avoid:
+• generic templates
+• placeholder styling
+• clunky layouts
+• oversized spacing
+• unfinished UI
+
+==================================================
+DO NOT IMPLEMENT YET
+
+Leave these as future TODO placeholders only:
+• OCR scanning
+• barcode scanning
+• social features
+• trading system
+• deck builder
+• push notifications
+• PWA offline sync
+
+==================================================
+FINAL DELIVERABLES
+
+Generate:
+• complete deployable codebase
+• clean architecture
+• reusable typed components
+• responsive layouts
+• production-ready npm setup
+• deployment-ready Vercel config
+• Supabase schema SQL
+• README setup guide
+• environment variable examples
+
+APP NAME:
+DexVault
+
+TAGLINE:
+“Track Every Card You Catch.”
