@@ -3,8 +3,7 @@ import { useCollectionStore } from '@/store/collectionStore';
 import { useCollectionValue } from '@/hooks/use-collection-value';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Library, Star, Target, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
-import { Redirect, Link } from 'wouter';
-import { Button } from '@/components/ui/button';
+import { Redirect } from 'wouter';
 
 const SQL_SETUP = `-- Run this in your Supabase project's SQL editor
 
@@ -161,63 +160,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle>Recent Additions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {collectionLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-10 bg-muted rounded animate-pulse" />
-                ))}
-              </div>
-            ) : cardsArray.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                No cards yet.{' '}
-                <Link href="/search" className="text-primary hover:underline">Search for cards</Link>
-                {' '}to add them.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {[...cardsArray]
-                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                  .slice(0, 5)
-                  .map((c) => (
-                    <div key={c.cardId} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
-                      <span className="font-mono text-xs text-muted-foreground truncate">{c.cardId}</span>
-                      <span className="text-xs text-muted-foreground ml-2 shrink-0">×{c.quantity}</span>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border">
-          <CardHeader className="flex items-center justify-between flex-row">
-            <CardTitle>Quick Links</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href="/search" data-testid="link-search-cards">
-                <Library className="w-4 h-4 mr-2" /> Search Cards
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href="/sets" data-testid="link-browse-sets">
-                <Target className="w-4 h-4 mr-2" /> Browse Sets
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full justify-start" asChild>
-              <Link href="/collection" data-testid="link-my-collection">
-                <Star className="w-4 h-4 mr-2" /> My Collection
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
