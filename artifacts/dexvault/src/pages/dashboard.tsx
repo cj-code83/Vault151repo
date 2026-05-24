@@ -3,7 +3,10 @@ import { useCollectionStore } from '@/store/collectionStore';
 import { useCollectionValue } from '@/hooks/use-collection-value';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Library, Star, Target, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
-import { Redirect } from 'wouter';
+import { Redirect, Link } from 'wouter';
+import { useQueries } from '@tanstack/react-query';
+import { getCard } from '@/services/pokemonTcg';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const SQL_SETUP = `-- Run this in your Supabase project's SQL editor
 
@@ -32,6 +35,85 @@ create table if not exists profiles (
 alter table profiles enable row level security;
 create policy "Users manage own profile" on profiles
   for all using (auth.uid() = id) with check (auth.uid() = id);`;
+
+function FavouritesPanel() {
+  const collectionCards = useCollectionStore((s) => s.collectionCards);
+  const favouriteIds = Object.values(collectionCards)
+    .filter((c) => c.isFavorite)
+    .map((c) => c.cardId);
+
+  const queries = useQueries({
+    queries: favouriteIds.map((id) => ({
+      queryKey: ['card-price', id],
+      queryFn: () => getCard(id),
+      staleTime: 1000 * 60 * 60 * 24,
+    })),
+  });
+
+  const isLoading = favouriteIds.length > 0 && queries.some((q) => q.isPending);
+
+  const rankedCards = queries
+    .flatMap((q) => (q.data ? [q.data] : []))
+    .map((card) => {
+      const prices = card.tcgplayer?.prices;
+      const marketPrice = prices
+        ? Object.values(prices).reduce((best, v) => {
+            const p = v.market ?? v.mid ?? 0;
+            return p > best ? p : best;
+          }, 0)
+        : 0;
+      return { card, marketPrice };
+    })
+    .sort((a, b) => b.marketPrice - a.marketPrice)
+    .slice(0, 3);
+
+  return (
+    <Card className="border-border">
+      <CardHeader className="flex flex-row items-center justify-between pb-3 space-y-0">
+        <CardTitle className="text-base font-semibold">Favourites</CardTitle>
+        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500/30" />
+      </CardHeader>
+      <CardContent>
+        {favouriteIds.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            No favourites yet. Star a card from its detail page to add it here.
+          </p>
+        ) : isLoading ? (
+          <div className="flex gap-4">
+            {Array.from({ length: Math.min(favouriteIds.length, 3) }).map((_, i) => (
+              <Skeleton key={i} className="flex-1 aspect-[63/88] rounded-xl" />
+            ))}
+          </div>
+        ) : rankedCards.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            Loading card data…
+          </p>
+        ) : (
+          <div className="flex gap-4">
+            {rankedCards.map(({ card, marketPrice }) => (
+              <Link key={card.id} href={`/card/${card.id}`} className="flex-1 group">
+                <div className="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-xl group-hover:scale-105 transition-all duration-200 cursor-pointer">
+                  <img
+                    src={card.images.small}
+                    alt={card.name}
+                    className="w-full h-auto object-contain"
+                    loading="lazy"
+                  />
+                  {marketPrice > 0 && (
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 backdrop-blur-sm text-white text-xs font-mono font-bold text-center py-1">
+                      ${marketPrice.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground text-center mt-1 truncate">{card.name}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -127,7 +209,7 @@ export default function Dashboard() {
 
         <Card className="hover-elevate transition-all border-border shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Favorites</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Favourites</CardTitle>
             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500/20" />
           </CardHeader>
           <CardContent>
@@ -160,6 +242,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      <FavouritesPanel />
     </div>
   );
 }

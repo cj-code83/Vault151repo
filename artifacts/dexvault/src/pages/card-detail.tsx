@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, Heart } from 'lucide-react';
+import { Plus, Minus, Star, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function CardDetail() {
   const [, params] = useRoute('/card/:id');
   const cardId = params?.id;
   const { user } = useAuth();
-  const { collectionCards, addCard, updateQuantity, toggleWishlist } = useCollectionStore();
+  const { collectionCards, addCard, updateQuantity, toggleFavorite, toggleWishlist } = useCollectionStore();
 
   const { data: card, isLoading, isError } = useQuery({
     queryKey: ['card', cardId],
@@ -93,6 +93,15 @@ export default function CardDetail() {
               </div>
 
               <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  variant={owned?.isFavorite ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => user && owned && toggleFavorite(card.id, user.id)}
+                  disabled={!user || !owned}
+                  title={owned?.isFavorite ? "Remove from favourites" : "Add to favourites"}
+                >
+                  <Star className={`h-5 w-5 ${owned?.isFavorite ? "fill-current" : ""}`} />
+                </Button>
                 <Button 
                   variant={owned?.isWishlisted ? "default" : "outline"}
                   onClick={() => user && toggleWishlist(card.id, user.id)}
