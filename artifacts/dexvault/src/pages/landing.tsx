@@ -1,7 +1,7 @@
 import { useAuth } from '@/hooks/use-auth';
 import { AuthForm } from '@/components/auth-form';
 import { Redirect } from 'wouter';
-import logoUrl from '@assets/vault151_logo_outline_1779626443797.png';
+import logoUrl from '@assets/vault_151_LOGO_1779626964573.png';
 
 const SHOWCASE_CARDS = [
   {
