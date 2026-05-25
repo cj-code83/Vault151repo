@@ -5,34 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Library, Star, Target, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Redirect, Link } from 'wouter';
 
-const SQL_SETUP = `-- Run this in your Supabase project's SQL editor
-
-create table if not exists collection_cards (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete cascade not null,
-  card_id text not null,
-  quantity integer default 1,
-  condition text default 'Near Mint',
-  is_favorite boolean default false,
-  is_wishlisted boolean default false,
-  notes text,
-  created_at timestamptz default now(),
-  unique(user_id, card_id)
-);
-alter table collection_cards enable row level security;
-create policy "Users manage own cards" on collection_cards
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
-create table if not exists profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  username text unique,
-  avatar_url text,
-  updated_at timestamptz default now()
-);
-alter table profiles enable row level security;
-create policy "Users manage own profile" on profiles
-  for all using (auth.uid() = id) with check (auth.uid() = id);`;
-
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const { collectionCards, loading: collectionLoading, dbSetupRequired } = useCollectionStore();
@@ -57,115 +29,112 @@ export default function Dashboard() {
   const wishlistedCards = cardsArray.filter((c) => c.isWishlisted).length;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col gap-4 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your collection.</p>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">Dashboard</h1>
+        <p className="text-sm md:text-base text-muted-foreground">Overview of your collection.</p>
       </div>
 
       {dbSetupRequired && (
-        <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-4 flex flex-col sm:flex-row gap-4">
-          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 md:p-4 flex items-start gap-2 md:gap-4">
+          <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-amber-800 dark:text-amber-300">Database setup required</p>
-            <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-              Your Supabase project needs the DexVault tables before you can save cards. Copy the SQL below and run it in your Supabase SQL editor.
+            <p className="font-semibold text-sm text-amber-800 dark:text-amber-300">Database setup required</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 hidden md:block">
+              Your Supabase project needs the Vault151 tables before you can save cards.
             </p>
-            <pre className="mt-3 text-xs bg-amber-100 dark:bg-amber-900/50 rounded-lg p-3 overflow-x-auto font-mono text-amber-900 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-              {SQL_SETUP}
-            </pre>
-            <a
-              href="https://supabase.com/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline"
-            >
-              Open Supabase Dashboard <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
+          <a
+            href="https://supabase.com/dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:underline shrink-0"
+          >
+            Fix <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover-elevate transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-red-600 dark:text-red-500">Total Cards</CardTitle>
-            <Library className="w-4 h-4 text-red-600 dark:text-red-500" />
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <Card className="transition-all border-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-red-600 dark:text-red-500">Total Cards</CardTitle>
+            <Library className="w-3.5 h-3.5 md:w-4 md:h-4 text-red-600 dark:text-red-500 shrink-0" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
             {collectionLoading ? (
-              <div className="h-8 w-16 bg-muted rounded animate-pulse" />
+              <div className="h-7 w-14 bg-muted rounded animate-pulse" />
             ) : (
               <>
                 <Link href="/collection">
-                  <div className="text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-total-cards">
+                  <div className="text-xl md:text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-total-cards">
                     {totalCards}
                   </div>
                 </Link>
-                <p className="text-xs text-muted-foreground mt-1">{uniqueCards} unique prints</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">{uniqueCards} unique prints</p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card className="hover-elevate transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-green-600 dark:text-green-500">Estimated Value</CardTitle>
-            <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-500" />
+        <Card className="transition-all border-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-green-600 dark:text-green-500">Est. Value</CardTitle>
+            <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-600 dark:text-green-500 shrink-0" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
             {valueLoading ? (
-              <div className="h-8 w-24 bg-muted rounded animate-pulse" />
+              <div className="h-7 w-20 bg-muted rounded animate-pulse" />
             ) : (
               <>
-                <div className="text-2xl font-bold font-mono" data-testid="text-collection-value">
+                <div className="text-xl md:text-2xl font-bold font-mono" data-testid="text-collection-value">
                   {hasData ? `$${totalValue.toFixed(2)}` : '--'}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {hasData ? 'TCGPlayer market price' : 'No price data available'}
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">
+                  {hasData ? 'TCGPlayer market' : 'No price data'}
                 </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card className="hover-elevate transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-yellow-600 dark:text-yellow-500">Favourites</CardTitle>
-            <Star className="w-4 h-4 text-yellow-600 dark:text-yellow-500 fill-yellow-500/20" />
+        <Card className="transition-all border-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-yellow-600 dark:text-yellow-500">Favourites</CardTitle>
+            <Star className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-600 dark:text-yellow-500 fill-yellow-500/20 shrink-0" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
             {collectionLoading ? (
-              <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+              <div className="h-7 w-8 bg-muted rounded animate-pulse" />
             ) : (
               <>
                 <Link href="/collection?tab=favourites">
-                  <div className="text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-favorite-count">
+                  <div className="text-xl md:text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-favorite-count">
                     {favoriteCards}
                   </div>
                 </Link>
-                <p className="text-xs text-muted-foreground mt-1">Starred in collection</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Starred cards</p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card className="hover-elevate transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-500">Wishlist</CardTitle>
-            <Target className="w-4 h-4 text-blue-600 dark:text-blue-500" />
+        <Card className="transition-all border-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-blue-600 dark:text-blue-500">Wishlist</CardTitle>
+            <Target className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-600 dark:text-blue-500 shrink-0" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
             {collectionLoading ? (
-              <div className="h-8 w-8 bg-muted rounded animate-pulse" />
+              <div className="h-7 w-8 bg-muted rounded animate-pulse" />
             ) : (
               <>
                 <Link href="/collection?tab=wishlist">
-                  <div className="text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-wishlist-count">
+                  <div className="text-xl md:text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-wishlist-count">
                     {wishlistedCards}
                   </div>
                 </Link>
-                <p className="text-xs text-muted-foreground mt-1">Cards you're hunting</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Cards hunting</p>
               </>
             )}
           </CardContent>

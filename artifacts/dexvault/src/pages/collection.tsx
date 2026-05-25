@@ -75,19 +75,20 @@ export default function Collection() {
     favouriteIds;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">My Collection</h1>
-        <p className="text-muted-foreground">Your personal vault.</p>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
+      <div className="sticky top-16 md:top-0 z-[5] bg-background/95 backdrop-blur-sm -mx-4 md:-mx-8 px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-border space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-1">My Collection</h1>
+          <p className="text-muted-foreground">Your personal vault.</p>
+        </div>
         <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="owned">Owned ({ownedCards.length})</TabsTrigger>
           <TabsTrigger value="wishlist">Wishlist ({wishlistedCards.length})</TabsTrigger>
           <TabsTrigger value="favourites">Favourites ({favouritedCards.length})</TabsTrigger>
         </TabsList>
+      </div>
 
+      <div className="pt-6">
         {(['owned', 'wishlist', 'favourites'] as const).map((tab) => {
           const ids =
             tab === 'owned' ? ownedIds :
@@ -95,7 +96,7 @@ export default function Collection() {
             favouriteIds;
 
           return (
-            <TabsContent key={tab} value={tab} className="mt-6">
+            <TabsContent key={tab} value={tab} className="mt-0">
               {ids.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
                   {emptyMessage[tab]}
@@ -106,7 +107,7 @@ export default function Collection() {
             </TabsContent>
           );
         })}
-      </Tabs>
-    </div>
+      </div>
+    </Tabs>
   );
 }

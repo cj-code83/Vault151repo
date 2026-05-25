@@ -52,84 +52,86 @@ export default function Sets() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="flex flex-col">
+      <div className="sticky top-16 md:top-0 z-[5] bg-background/95 backdrop-blur-sm -mx-4 md:-mx-8 px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-border">
         <h1 className="text-3xl font-bold tracking-tight mb-1">Sets</h1>
         <p className="text-muted-foreground">Browse every era of English Pokémon TCG.</p>
       </div>
 
-      {isLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
-      )}
+      <div className="pt-6 space-y-8">
+        {isLoading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-xl" />
+            ))}
+          </div>
+        )}
 
-      {isError && (
-        <div className="text-destructive">Failed to load sets. Please try again.</div>
-      )}
+        {isError && (
+          <div className="text-destructive">Failed to load sets. Please try again.</div>
+        )}
 
-      {!isLoading && !isError && groupedSets.map(({ era, sets: eraSets }) => (
-        <section key={era}>
-          <h2 className="text-lg font-semibold mb-3 text-foreground/80 border-b border-border pb-2">{era}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {eraSets.map((set, i) => {
-              const { owned, total, pct } = getCompletion(set, collectionCards);
-              return (
-                <motion.div
-                  key={set.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: i * 0.03 }}
-                  className="group cursor-pointer rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden"
-                  onClick={() => setLocation(`/sets/${set.id}`)}
-                  data-testid={`set-card-${set.id}`}
-                >
-                  <div className="flex items-center gap-3 p-4">
-                    <div className="w-20 h-12 shrink-0 flex items-center justify-center">
-                      {set.images.logo ? (
-                        <img
-                          src={set.images.logo}
-                          alt={set.name}
-                          className="max-w-full max-h-full object-contain"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = set.images.symbol;
-                          }}
-                        />
-                      ) : (
-                        <img
-                          src={set.images.symbol}
-                          alt={set.name}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">{set.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">{set.releaseDate} · {total} cards</p>
-                      <div className="mt-2 space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{owned} / {total} owned</span>
-                          <span className={`font-semibold ${pct === 100 ? 'text-green-500' : pct > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
-                            {pct}%
-                          </span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
-                            style={{ width: `${pct}%` }}
+        {!isLoading && !isError && groupedSets.map(({ era, sets: eraSets }) => (
+          <section key={era}>
+            <h2 className="text-lg font-semibold mb-3 text-foreground/80 border-b border-border pb-2">{era}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {eraSets.map((set, i) => {
+                const { owned, total, pct } = getCompletion(set, collectionCards);
+                return (
+                  <motion.div
+                    key={set.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: i * 0.03 }}
+                    className="group cursor-pointer rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden"
+                    onClick={() => setLocation(`/sets/${set.id}`)}
+                    data-testid={`set-card-${set.id}`}
+                  >
+                    <div className="flex items-center gap-3 p-4">
+                      <div className="w-20 h-12 shrink-0 flex items-center justify-center">
+                        {set.images.logo ? (
+                          <img
+                            src={set.images.logo}
+                            alt={set.name}
+                            className="max-w-full max-h-full object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = set.images.symbol;
+                            }}
                           />
+                        ) : (
+                          <img
+                            src={set.images.symbol}
+                            alt={set.name}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">{set.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">{set.releaseDate} · {total} cards</p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">{owned} / {total} owned</span>
+                            <span className={`font-semibold ${pct === 100 ? 'text-green-500' : pct > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                              {pct}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
