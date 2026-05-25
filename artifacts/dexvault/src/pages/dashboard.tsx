@@ -1,9 +1,57 @@
 import { useAuth } from '@/hooks/use-auth';
 import { useCollectionStore } from '@/store/collectionStore';
 import { useCollectionValue } from '@/hooks/use-collection-value';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Library, Star, Target, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Redirect, Link } from 'wouter';
+
+function StatCard({
+  title,
+  icon: Icon,
+  color,
+  value,
+  sub,
+  href,
+  loading,
+}: {
+  title: string;
+  icon: React.ElementType;
+  color: string;
+  value: string | number;
+  sub: string;
+  href?: string;
+  loading?: boolean;
+}) {
+  const number = loading ? (
+    <div className="h-7 w-16 bg-muted rounded animate-pulse" />
+  ) : href ? (
+    <Link href={href}>
+      <span className="text-2xl font-bold hover:underline cursor-pointer tabular-nums">{value}</span>
+    </Link>
+  ) : (
+    <span className="text-2xl font-bold tabular-nums">{value}</span>
+  );
+
+  return (
+    <Card className="border-border shadow-sm">
+      <CardContent className="px-4 py-3 md:px-6 md:py-4">
+        {/* Mobile: icon+label left, number right */}
+        {/* Desktop: stacked */}
+        <div className="flex items-center justify-between md:block">
+          <div className="flex items-center gap-2 md:justify-between md:mb-2">
+            <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+            <span className={`text-sm font-medium ${color}`}>{title}</span>
+          </div>
+          <div className="md:mt-0 text-right md:text-left">
+            {number}
+            <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 hidden md:block">{sub}</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-0.5 md:hidden">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -23,8 +71,13 @@ export default function Dashboard() {
   }
 
   const cardsArray = Object.values(collectionCards);
-  const totalCards = cardsArray.reduce((acc, card) => acc + card.quantity, 0);
-  const uniqueCards = cardsArray.length;
+  const totalCards = cardsArray.reduce((acc, card) => {
+    const vTotal = Object.values(card.variants ?? {}).reduce((s, v) => s + v, 0);
+    return acc + card.quantity + vTotal;
+  }, 0);
+  const uniqueCards = cardsArray.filter(
+    (c) => c.quantity > 0 || Object.values(c.variants ?? {}).some((v) => v > 0)
+  ).length;
   const favoriteCards = cardsArray.filter((c) => c.isFavorite).length;
   const wishlistedCards = cardsArray.filter((c) => c.isWishlisted).length;
 
@@ -55,90 +108,43 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-        <Card className="transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium text-red-600 dark:text-red-500">Total Cards</CardTitle>
-            <Library className="w-3.5 h-3.5 md:w-4 md:h-4 text-red-600 dark:text-red-500 shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
-            {collectionLoading ? (
-              <div className="h-7 w-14 bg-muted rounded animate-pulse" />
-            ) : (
-              <>
-                <Link href="/collection">
-                  <div className="text-xl md:text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-total-cards">
-                    {totalCards}
-                  </div>
-                </Link>
-                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">{uniqueCards} unique prints</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium text-green-600 dark:text-green-500">Est. Value</CardTitle>
-            <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-600 dark:text-green-500 shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
-            {valueLoading ? (
-              <div className="h-7 w-20 bg-muted rounded animate-pulse" />
-            ) : (
-              <>
-                <div className="text-xl md:text-2xl font-bold font-mono" data-testid="text-collection-value">
-                  {hasData ? `$${totalValue.toFixed(2)}` : '--'}
-                </div>
-                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">
-                  {hasData ? 'TCGPlayer market' : 'No price data'}
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium text-yellow-600 dark:text-yellow-500">Favourites</CardTitle>
-            <Star className="w-3.5 h-3.5 md:w-4 md:h-4 text-yellow-600 dark:text-yellow-500 fill-yellow-500/20 shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
-            {collectionLoading ? (
-              <div className="h-7 w-8 bg-muted rounded animate-pulse" />
-            ) : (
-              <>
-                <Link href="/collection?tab=favourites">
-                  <div className="text-xl md:text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-favorite-count">
-                    {favoriteCards}
-                  </div>
-                </Link>
-                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Starred cards</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all border-border shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 space-y-0 px-3 pt-3 md:px-6 md:pt-6">
-            <CardTitle className="text-xs md:text-sm font-medium text-blue-600 dark:text-blue-500">Wishlist</CardTitle>
-            <Target className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-600 dark:text-blue-500 shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
-            {collectionLoading ? (
-              <div className="h-7 w-8 bg-muted rounded animate-pulse" />
-            ) : (
-              <>
-                <Link href="/collection?tab=wishlist">
-                  <div className="text-xl md:text-2xl font-bold hover:underline cursor-pointer w-fit" data-testid="text-wishlist-count">
-                    {wishlistedCards}
-                  </div>
-                </Link>
-                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">Cards hunting</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      {/* 1-column on mobile, 4-column on md+ */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <StatCard
+          title="Total Cards"
+          icon={Library}
+          color="text-red-600 dark:text-red-500"
+          value={totalCards}
+          sub={`${uniqueCards} unique prints`}
+          href="/collection"
+          loading={collectionLoading}
+        />
+        <StatCard
+          title="Est. Value"
+          icon={TrendingUp}
+          color="text-green-600 dark:text-green-500"
+          value={hasData ? `$${totalValue.toFixed(2)}` : '--'}
+          sub={hasData ? 'TCGPlayer market' : 'No price data'}
+          loading={valueLoading}
+        />
+        <StatCard
+          title="Favourites"
+          icon={Star}
+          color="text-yellow-600 dark:text-yellow-500"
+          value={favoriteCards}
+          sub="Starred cards"
+          href="/collection?tab=favourites"
+          loading={collectionLoading}
+        />
+        <StatCard
+          title="Wishlist"
+          icon={Target}
+          color="text-blue-600 dark:text-blue-500"
+          value={wishlistedCards}
+          sub="Cards hunting"
+          href="/collection?tab=wishlist"
+          loading={collectionLoading}
+        />
       </div>
     </div>
   );

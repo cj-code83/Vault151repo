@@ -7,6 +7,10 @@ import { CardItem } from '@/components/card-item';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearch } from 'wouter';
 
+function variantTotal(variants?: Record<string, number>) {
+  return Object.values(variants ?? {}).reduce((s, v) => s + v, 0);
+}
+
 function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
   const sortedKey = [...ids].sort().join(',');
   const { data: cards, isLoading } = useQuery({
@@ -55,13 +59,17 @@ export default function Collection() {
 
   const { collectionCards } = useCollectionStore();
 
-  const ownedCards = Object.values(collectionCards).filter(c => c.quantity > 0);
-  const wishlistedCards = Object.values(collectionCards).filter(c => c.isWishlisted && c.quantity === 0);
-  const favouritedCards = Object.values(collectionCards).filter(c => c.isFavorite);
+  const ownedCards = Object.values(collectionCards).filter(
+    (c) => (c.quantity > 0 || variantTotal(c.variants) > 0) && !c.isWishlisted
+  );
+  const wishlistedCards = Object.values(collectionCards).filter(
+    (c) => c.isWishlisted && c.quantity === 0 && variantTotal(c.variants) === 0
+  );
+  const favouritedCards = Object.values(collectionCards).filter((c) => c.isFavorite);
 
-  const ownedIds = ownedCards.map(c => c.cardId);
-  const wishlistIds = wishlistedCards.map(c => c.cardId);
-  const favouriteIds = favouritedCards.map(c => c.cardId);
+  const ownedIds = ownedCards.map((c) => c.cardId);
+  const wishlistIds = wishlistedCards.map((c) => c.cardId);
+  const favouriteIds = favouritedCards.map((c) => c.cardId);
 
   const emptyMessage: Record<string, string> = {
     owned: 'Your collection is empty. Search for cards to add them.',

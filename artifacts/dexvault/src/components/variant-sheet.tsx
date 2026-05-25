@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Minus, PenLine, X } from 'lucide-react';
@@ -38,9 +38,9 @@ export function VariantSheet({ card, open, onOpenChange }: VariantSheetProps) {
   };
 
   const handleAddCustom = async () => {
-    const key = customInput.trim();
-    if (!key || !user) return;
-    const slug = key.toLowerCase().replace(/\s+/g, '_');
+    const label = customInput.trim();
+    if (!label || !user) return;
+    const slug = label.toLowerCase().replace(/\s+/g, '_');
     const newVariants = { ...variants, [slug]: (variants[slug] ?? 0) + 1 };
     await updateVariants(card.id, newVariants, user.id, card);
     setCustomInput('');
@@ -62,18 +62,25 @@ export function VariantSheet({ card, open, onOpenChange }: VariantSheetProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl pb-8">
-        <SheetHeader className="mb-4">
-          <SheetTitle className="text-left">{card.name} — Print Variants</SheetTitle>
-        </SheetHeader>
+      {/* p-0 overrides the default p-6 so we control all padding ourselves */}
+      <SheetContent
+        side="bottom"
+        className="rounded-t-2xl flex flex-col p-0 max-h-[85vh]"
+        aria-describedby={undefined}
+      >
+        {/* Fixed header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">
+          <SheetTitle className="text-base">{card.name} — Print Variants</SheetTitle>
+        </div>
 
-        {allKeys.length === 0 ? (
-          <p className="text-sm text-muted-foreground mb-4">
-            No TCGPlayer price data for this card. Use "Add Custom Variant" below to track your copies.
-          </p>
-        ) : (
-          <div className="space-y-2 mb-4">
-            {allKeys.map((key) => {
+        {/* Scrollable variants list */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+          {allKeys.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">
+              No TCGPlayer price data for this card. Use "Add Custom Variant" below to track your copies.
+            </p>
+          ) : (
+            allKeys.map((key) => {
               const qty = variants[key] ?? 0;
               const priceData = prices[key];
               const price = priceData?.market ?? priceData?.mid;
@@ -92,7 +99,7 @@ export function VariantSheet({ card, open, onOpenChange }: VariantSheetProps) {
                           : formatVariantName(key)}
                       </span>
                       {isCustom && (
-                        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
+                        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium leading-none">
                           custom
                         </span>
                       )}
@@ -144,51 +151,60 @@ export function VariantSheet({ card, open, onOpenChange }: VariantSheetProps) {
                   </div>
                 </div>
               );
-            })}
-          </div>
-        )}
+            })
+          )}
+        </div>
 
-        {/* Custom variant input */}
-        {showCustomInput ? (
-          <div className="flex gap-2 mb-4">
-            <Input
-              placeholder="e.g. W Stamped, Shadowless, 1st Ed. CGC 9..."
-              value={customInput}
-              onChange={(e) => setCustomInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddCustom()}
-              autoFocus
-              className="flex-1"
-            />
-            <Button onClick={handleAddCustom} disabled={!customInput.trim()}>
-              Add
+        {/* Fixed footer: custom variant + summary */}
+        <div className="px-6 pb-8 pt-3 border-t border-border shrink-0 space-y-3">
+          {showCustomInput ? (
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g. W Stamped, Shadowless, CGC 9..."
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCustom()}
+                autoFocus
+                className="flex-1"
+              />
+              <Button onClick={handleAddCustom} disabled={!customInput.trim()}>
+                Add
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setShowCustomInput(false);
+                  setCustomInput('');
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => setShowCustomInput(true)}
+            >
+              <PenLine className="h-4 w-4" />
+              Add Custom Variant
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => { setShowCustomInput(false); setCustomInput(''); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            className="w-full gap-2 mb-4"
-            onClick={() => setShowCustomInput(true)}
-          >
-            <PenLine className="h-4 w-4" />
-            Add Custom Variant
-          </Button>
-        )}
+          )}
 
-        {totalVariantQty > 0 && (
-          <div className="pt-3 border-t border-border flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {totalVariantQty} variant copy{totalVariantQty !== 1 ? 'ies' : ''} tracked
-            </span>
-            {totalVariantValue > 0 && (
-              <span className="font-mono font-bold text-green-600 dark:text-green-400">
-                ${totalVariantValue.toFixed(2)} est. value
+          {totalVariantQty > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {totalVariantQty} variant {totalVariantQty === 1 ? 'copy' : 'copies'} tracked
               </span>
-            )}
-          </div>
-        )}
+              {totalVariantValue > 0 && (
+                <span className="font-mono font-bold text-green-600 dark:text-green-400">
+                  ${totalVariantValue.toFixed(2)} est. value
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
