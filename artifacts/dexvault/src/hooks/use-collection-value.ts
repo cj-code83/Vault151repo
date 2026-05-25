@@ -5,9 +5,10 @@ import { useCollectionStore } from '@/store/collectionStore';
 export function useCollectionValue() {
   const collectionCards = useCollectionStore((s) => s.collectionCards);
 
-  const ownedCards = Object.values(collectionCards).filter(
-    (c) => c.quantity > 0 && !c.isWishlisted
-  );
+  const ownedCards = Object.values(collectionCards).filter((c) => {
+    const variantTotal = Object.values(c.variants ?? {}).reduce((s, v) => s + v, 0);
+    return (c.quantity > 0 || variantTotal > 0) && !c.isWishlisted;
+  });
   const cardIds = ownedCards.map((c) => c.cardId);
 
   const queries = useQueries({
@@ -24,14 +25,26 @@ export function useCollectionValue() {
   let totalValue = 0;
   for (const card of allCards) {
     const owned = collectionCards[card.id];
-    if (!owned || owned.quantity <= 0 || owned.isWishlisted) continue;
+    if (!owned || owned.isWishlisted) continue;
+
     const prices = card.tcgplayer?.prices;
     if (!prices) continue;
+
     const bestMarket = Object.values(prices).reduce((best, v) => {
       const price = v.market ?? v.mid ?? 0;
       return price > best ? price : best;
     }, 0);
-    totalValue += bestMarket * owned.quantity;
+
+    if (owned.quantity > 0) {
+      totalValue += bestMarket * owned.quantity;
+    }
+
+    const variantMap = owned.variants ?? {};
+    for (const [key, qty] of Object.entries(variantMap)) {
+      if (qty <= 0) continue;
+      const variantPrice = prices[key]?.market ?? prices[key]?.mid ?? bestMarket;
+      totalValue += variantPrice * qty;
+    }
   }
 
   const hasData = allCards.length > 0;

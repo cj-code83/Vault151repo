@@ -14,6 +14,7 @@ interface CollectionState {
   toggleWishlist: (cardId: string, userId: string) => Promise<void>;
   updateQuantity: (cardId: string, quantity: number, userId: string) => Promise<void>;
   updateCondition: (cardId: string, condition: string, userId: string) => Promise<void>;
+  updateVariants: (cardId: string, variants: Record<string, number>, userId: string, cardForCreate?: PokemonCard) => Promise<void>;
 }
 
 function isTableMissingError(error: { code?: string; message?: string }) {
@@ -59,6 +60,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
           isWishlisted: item.is_wishlisted,
           notes: item.notes,
           createdAt: item.created_at,
+          variants: item.variants ?? {},
         };
       });
       set({ collectionCards: cardsRecord, loading: false, dbSetupRequired: false });
@@ -79,6 +81,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       condition: 'Near Mint',
       is_favorite: false,
       is_wishlisted: false,
+      variants: {},
     };
 
     const tempId = `temp-${Date.now()}`;
@@ -91,6 +94,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       isFavorite: false,
       isWishlisted: false,
       createdAt: new Date().toISOString(),
+      variants: {},
     };
 
     set((state) => ({
@@ -195,6 +199,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         condition: 'Near Mint',
         is_favorite: false,
         is_wishlisted: true,
+        variants: {},
       };
 
       const tempId = `temp-${Date.now()}`;
@@ -207,6 +212,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         isFavorite: false,
         isWishlisted: true,
         createdAt: new Date().toISOString(),
+        variants: {},
       };
 
       set((state) => ({
@@ -274,20 +280,24 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     const existing = get().collectionCards[cardId];
     if (!existing) return;
 
-    if (quantity <= 0 && !existing.isWishlisted) {
+    const variantTotal = Object.values(existing.variants ?? {}).reduce((s, v) => s + v, 0);
+
+    if (quantity <= 0 && variantTotal === 0 && !existing.isWishlisted) {
       return get().removeCard(cardId, userId);
     }
+
+    const safeQty = Math.max(0, quantity);
 
     set((state) => ({
       collectionCards: {
         ...state.collectionCards,
-        [cardId]: { ...existing, quantity },
+        [cardId]: { ...existing, quantity: safeQty },
       },
     }));
 
     const { error } = await supabase
       .from('collection_cards')
-      .update({ quantity })
+      .update({ quantity: safeQty })
       .eq('user_id', userId)
       .eq('card_id', cardId);
 
@@ -327,6 +337,101 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         },
       }));
       toast.error('Could not update condition', { description: error.message });
+    }
+  },
+
+  updateVariants: async (cardId: string, variants: Record<string, number>, userId: string, cardForCreate?: PokemonCard) => {
+    const existing = get().collectionCards[cardId];
+    const variantTotal = Object.values(variants).reduce((s, v) => s + v, 0);
+
+    if (!existing) {
+      if (variantTotal === 0 || !cardForCreate) return;
+
+      const newEntry = {
+        user_id: userId,
+        card_id: cardId,
+        quantity: 0,
+        condition: 'Near Mint',
+        is_favorite: false,
+        is_wishlisted: false,
+        variants,
+      };
+
+      const tempId = `temp-${Date.now()}`;
+      const optimistic: CollectionCard = {
+        id: tempId,
+        userId,
+        cardId,
+        quantity: 0,
+        condition: 'Near Mint',
+        isFavorite: false,
+        isWishlisted: false,
+        createdAt: new Date().toISOString(),
+        variants,
+      };
+
+      set((state) => ({
+        collectionCards: { ...state.collectionCards, [cardId]: optimistic },
+      }));
+
+      const { data, error } = await supabase
+        .from('collection_cards')
+        .upsert(newEntry, { onConflict: 'user_id,card_id' })
+        .select()
+        .single();
+
+      if (error) {
+        set((state) => {
+          const next = { ...state.collectionCards };
+          delete next[cardId];
+          return { collectionCards: next };
+        });
+        if (isTableMissingError(error)) {
+          set({ dbSetupRequired: true });
+          toast.error('Database not set up', {
+            description: 'Run the SQL setup in your Supabase project — see the Profile page.',
+          });
+        } else {
+          toast.error('Could not save variant', { description: error.message });
+        }
+      } else if (data) {
+        set((state) => ({
+          collectionCards: {
+            ...state.collectionCards,
+            [cardId]: { ...optimistic, id: data.id },
+          },
+        }));
+      }
+      return;
+    }
+
+    const prevVariants = existing.variants ?? {};
+
+    if (variantTotal === 0 && existing.quantity === 0 && !existing.isWishlisted) {
+      return get().removeCard(cardId, userId);
+    }
+
+    set((state) => ({
+      collectionCards: {
+        ...state.collectionCards,
+        [cardId]: { ...existing, variants },
+      },
+    }));
+
+    const { error } = await supabase
+      .from('collection_cards')
+      .update({ variants })
+      .eq('user_id', userId)
+      .eq('card_id', cardId);
+
+    if (error) {
+      set((state) => ({
+        collectionCards: {
+          ...state.collectionCards,
+          [cardId]: { ...existing, variants: prevVariants },
+        },
+      }));
+      toast.error('Could not update variants', { description: error.message });
     }
   },
 }));

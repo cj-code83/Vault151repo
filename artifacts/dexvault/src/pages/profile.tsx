@@ -15,6 +15,7 @@ create table if not exists collection_cards (
   is_favorite boolean default false,
   is_wishlisted boolean default false,
   notes text,
+  variants jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
   unique(user_id, card_id)
 );
@@ -33,7 +34,10 @@ create table if not exists profiles (
 alter table profiles enable row level security;
 create policy "Users manage own profile" on profiles
   for all using (auth.uid() = id)
-  with check (auth.uid() = id);`;
+  with check (auth.uid() = id);
+
+-- Step 3: Add variants column if upgrading from an earlier version
+alter table collection_cards add column if not exists variants jsonb default '{}'::jsonb;`;
 
 export default function Profile() {
   const { user, signOut } = useAuth();

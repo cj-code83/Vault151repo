@@ -10,7 +10,7 @@ export interface PokemonCard {
   rarity?: string;
   flavorText?: string;
   images: { small: string; large: string };
-  set: { id: string; name: string; series: string; releaseDate: string; images: { symbol: string; logo: string } };
+  set: { id: string; name: string; series: string; releaseDate: string; printedTotal?: number; images: { symbol: string; logo: string } };
   tcgplayer?: { prices?: Record<string, { market?: number; mid?: number }> };
 }
 
@@ -34,4 +34,5 @@ export interface CollectionCard {
   isWishlisted: boolean;
   notes?: string;
   createdAt: string;
+  variants?: Record<string, number>;
 }
