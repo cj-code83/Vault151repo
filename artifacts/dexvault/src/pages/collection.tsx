@@ -76,7 +76,7 @@ export default function Collection() {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
-      <div className="sticky top-16 md:top-0 z-[5] bg-background/95 backdrop-blur-sm -mx-4 md:-mx-8 px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-border space-y-4">
+      <div className="sticky top-16 md:top-0 z-20 bg-background -mx-4 md:-mx-8 px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-border space-y-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-1">My Collection</h1>
           <p className="text-muted-foreground">Your personal vault.</p>

@@ -23,10 +23,10 @@ function Vault151Logo({ size = 32 }: { size?: number }) {
   );
 }
 
-function Vault151Wordmark({ className = '' }: { className?: string }) {
+function Vault151Wordmark({ className = '', vaultClassName = 'text-foreground' }: { className?: string; vaultClassName?: string }) {
   return (
     <span className={`font-bold tracking-tight ${className}`}>
-      <span className="text-foreground">Vault</span>
+      <span className={vaultClassName}>Vault</span>
       <span className="text-red-600 dark:text-red-500">151</span>
     </span>
   );
@@ -99,14 +99,16 @@ export function Layout({ children }: LayoutProps) {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 pb-[72px] md:pb-0 [overflow-x:clip]">
-        <header className="md:hidden flex items-center justify-between px-4 h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
+        {/* Mobile top bar — always black */}
+        <header className="md:hidden flex items-center justify-between px-4 h-16 bg-black border-b border-black sticky top-0 z-30">
           <div className="flex items-center gap-2">
             <Vault151Logo size={28} />
-            <Vault151Wordmark className="text-lg" />
+            <Vault151Wordmark className="text-lg" vaultClassName="text-white" />
           </div>
           <Button
             variant="ghost"
             size="icon"
+            className="text-white hover:text-white hover:bg-white/10"
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             data-testid="button-toggle-theme-mobile"
           >
@@ -130,7 +132,8 @@ export function Layout({ children }: LayoutProps) {
           </div>
         )}
 
-        <div className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8">
+        {/* No top padding — sticky page headers own their own top padding */}
+        <div className="flex-1 max-w-7xl mx-auto w-full px-4 pb-4 md:px-8 md:pb-8">
           {children}
         </div>
       </main>
