@@ -98,7 +98,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col min-w-0 pb-[72px] md:pb-0 overflow-x-hidden">
+      <main className="flex-1 flex flex-col min-w-0 pb-[72px] md:pb-0 [overflow-x:clip]">
         <header className="md:hidden flex items-center justify-between px-4 h-16 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
           <div className="flex items-center gap-2">
             <Vault151Logo size={28} />
