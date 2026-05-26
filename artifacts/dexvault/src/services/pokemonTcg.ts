@@ -63,3 +63,28 @@ export async function getSets() {
   const json = await res.json();
   return json.data as PokemonSet[];
 }
+
+export async function getTrendingCards(): Promise<PokemonCard[]> {
+  // Fetch high-rarity cards from recent sets — the most sought-after market cards
+  const url = new URL(`${BASE_URL}/cards`);
+  url.searchParams.set(
+    'q',
+    'rarity:"Special Illustration Rare" OR rarity:"Hyper Rare" OR rarity:"Secret Rare"'
+  );
+  url.searchParams.set('orderBy', '-set.releaseDate');
+  url.searchParams.set('pageSize', '20');
+
+  const res = await fetch(url.toString(), { headers: headers() });
+  if (!res.ok) {
+    // Fallback: recent Pokémon cards
+    const fb = new URL(`${BASE_URL}/cards`);
+    fb.searchParams.set('q', 'supertype:Pokémon rarity:"Rare Holo"');
+    fb.searchParams.set('orderBy', '-set.releaseDate');
+    fb.searchParams.set('pageSize', '20');
+    const r = await fetch(fb.toString(), { headers: headers() });
+    const j = await r.json();
+    return j.data as PokemonCard[];
+  }
+  const json = await res.json();
+  return json.data as PokemonCard[];
+}

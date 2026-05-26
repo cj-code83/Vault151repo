@@ -16,6 +16,7 @@ import SetDetail from "@/pages/set-detail";
 import Collection from "@/pages/collection";
 import Profile from "@/pages/profile";
 import CardDetail from "@/pages/card-detail";
+import ScanPage from "@/pages/scan";
 import { useAuth } from "@/hooks/use-auth";
 import { useCollectionStore } from "@/store/collectionStore";
 
@@ -60,6 +61,7 @@ function Router() {
         <Route path="/" component={Landing} />
         <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
         <Route path="/search"><ProtectedRoute component={Search} /></Route>
+        <Route path="/scan"><ProtectedRoute component={ScanPage} /></Route>
         <Route path="/sets"><ProtectedRoute component={Sets} /></Route>
         <Route path="/sets/:id"><ProtectedRoute component={SetDetail} /></Route>
         <Route path="/collection"><ProtectedRoute component={Collection} /></Route>

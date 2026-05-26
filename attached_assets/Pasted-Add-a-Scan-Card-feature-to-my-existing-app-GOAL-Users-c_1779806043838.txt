@@ -1,0 +1,102 @@
+Add a “Scan Card” feature to my existing app.
+
+GOAL:
+Users can scan Pokémon cards using camera, detect card with bounding box overlay (like Pokémon TCG Live), identify it using OCR + Pokémon TCG API, then save it to Supabase.
+
+---
+
+FEATURES:
+
+1. CAMERA SCAN
+- Use getUserMedia for live camera feed
+- Must work on mobile (Android priority)
+- Full screen camera mode
+
+---
+
+2. REAL-TIME BOUNDING BOX DETECTION
+- Use TensorFlow.js
+- Use @tensorflow-models/coco-ssd
+- Run detection every ~200ms using requestAnimationFrame
+- Draw bounding box overlay on canvas above video
+- Highlight detected object in green when confidence > threshold
+- If stable detection for ~1 second → enable “Capture” button
+
+NOTE:
+This is a visual detection layer to simulate Pokémon TCG Live-style scanning.
+
+---
+
+3. CAPTURE FLOW
+When user taps “Capture”:
+- Freeze current video frame
+- Crop image using bounding box coordinates
+- Send cropped image to backend /api/scan-card
+
+---
+
+4. BACKEND /api/scan-card
+- Accept image upload (multipart/form-data)
+- Run OCR (Google Vision API preferred, fallback Tesseract.js)
+- Extract:
+  - Pokémon card name
+  - set number
+  - set name (if visible)
+
+- Query Pokémon TCG API:
+  - First match: exact name
+  - Second: fuzzy match fallback
+  - Return top 1–3 results with confidence score
+
+---
+
+5. SUPABASE INTEGRATION
+When user clicks “Add to Collection”:
+Insert into collection_cards table:
+- user_id
+- card_id
+- name
+- image_url
+- set_name
+- rarity
+- created_at
+
+---
+
+6. UI REQUIREMENTS
+- Live camera feed fullscreen
+- Canvas overlay for bounding box
+- “Card detected” indicator
+- Capture button only enabled when detection stable
+- Loading state during processing
+- Fallback manual upload option
+
+---
+
+7. PERFORMANCE
+- Detection interval: 150–300ms
+- Use requestAnimationFrame loop
+- Stop detection after capture
+- Prevent flickering bounding boxes
+
+---
+
+8. UX FLOW
+Camera → detect card → bounding box appears → user taps capture → OCR → TCG API match → show results → user confirms → save to Supabase
+
+---
+
+9. DEPENDENCIES
+Install:
+- @tensorflow/tfjs
+- @tensorflow-models/coco-ssd
+- react-webcam (optional)
+
+---
+
+END GOAL:
+A Pokémon TCG Live-style scanning experience with:
+- real-time detection
+- bounding box overlay
+- instant card identification
+- Supabase collection saving
