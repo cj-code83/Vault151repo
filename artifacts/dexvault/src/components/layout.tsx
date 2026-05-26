@@ -38,8 +38,8 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-sidebar px-4 py-6 shrink-0 h-screen sticky top-0">
-        <div className="flex items-center mb-8 px-2">
-          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-[52px] w-auto object-contain" />
+        <div className="-mx-4 -mt-6 mb-8">
+          <img src="/vault_151_blackbg.png" alt="Vault151" className="w-full h-auto object-contain" />
         </div>
 
         <nav className="flex-1 space-y-1">

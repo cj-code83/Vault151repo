@@ -99,8 +99,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 1×4 on mobile (flex-col, each card flex-1), 4-col grid on md+ */}
-      <div className="flex flex-col md:grid md:grid-cols-4 gap-3 flex-1 pb-2">
+      {/* 1×4 on mobile (flex-col, each card flex-1), 2×2 grid on md+ */}
+      <div className="flex flex-col md:grid md:grid-cols-2 gap-3 flex-1 pb-2">
         <StatCard
           title="Total Cards"
           icon={Library}
