@@ -270,6 +270,47 @@ export default function CardDetail() {
               })}
             </div>
 
+            {/* Legacy / non-preset tracked variants — show so user can remove them */}
+            {Object.entries(variantMap)
+              .filter(([k, qty]) => qty > 0 && !PRESET_VARIANTS.some((p) => p.key === k))
+              .map(([key, qty]) => (
+                <div
+                  key={key}
+                  className="flex items-center gap-3 py-2.5 border-t border-border first:border-t-0"
+                >
+                  <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
+                    {getVariantLetter(key)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-sm">
+                      {key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^\w/, (c) => c.toUpperCase()).trim()}
+                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground">(legacy)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleVariantChange(key, -1)}
+                      disabled={!user}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">{qty}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleVariantChange(key, 1)}
+                      disabled={!user}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
             {/* Variant totals */}
             {Object.values(variantMap).some((v) => v > 0) && (
               <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-sm">

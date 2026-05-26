@@ -39,7 +39,7 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-sidebar px-4 py-6 shrink-0 h-screen sticky top-0">
         <div className="flex items-center mb-8 px-2">
-          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-10 w-auto object-contain" />
+          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-[52px] w-auto object-contain" />
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -80,7 +80,7 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1 flex flex-col min-w-0 pb-[72px] md:pb-0 [overflow-x:clip]">
         {/* Mobile top bar — always black */}
         <header className="md:hidden flex items-center justify-between px-4 h-16 bg-black border-b border-black sticky top-0 z-30">
-          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-10 w-auto object-contain" />
+          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-[52px] w-auto object-contain" />
           <Button
             variant="ghost"
             size="icon"
