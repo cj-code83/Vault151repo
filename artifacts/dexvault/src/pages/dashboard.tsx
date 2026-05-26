@@ -5,15 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Library, Star, Target, TrendingUp, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Redirect, Link } from 'wouter';
 
-function StatCard({
-  title,
-  icon: Icon,
-  color,
-  value,
-  sub,
-  href,
-  loading,
-}: {
+interface StatCardProps {
   title: string;
   icon: React.ElementType;
   color: string;
@@ -21,33 +13,32 @@ function StatCard({
   sub: string;
   href?: string;
   loading?: boolean;
-}) {
-  const number = loading ? (
-    <div className="h-7 w-16 bg-muted rounded animate-pulse" />
+}
+
+function StatCard({ title, icon: Icon, color, value, sub, href, loading }: StatCardProps) {
+  const display = loading ? (
+    <div className="h-8 w-20 bg-muted rounded animate-pulse" />
   ) : href ? (
     <Link href={href}>
-      <span className="text-2xl font-bold hover:underline cursor-pointer tabular-nums">{value}</span>
+      <span className="text-3xl font-bold hover:underline cursor-pointer tabular-nums leading-none">
+        {value}
+      </span>
     </Link>
   ) : (
-    <span className="text-2xl font-bold tabular-nums">{value}</span>
+    <span className="text-3xl font-bold tabular-nums leading-none">{value}</span>
   );
 
   return (
-    <Card className="border-border shadow-sm">
-      <CardContent className="px-4 py-3 md:px-6 md:py-4">
-        {/* Mobile: icon+label left, number right */}
-        {/* Desktop: stacked */}
-        <div className="flex items-center justify-between md:block">
-          <div className="flex items-center gap-2 md:justify-between md:mb-2">
-            <Icon className={`w-4 h-4 shrink-0 ${color}`} />
-            <span className={`text-sm font-medium ${color}`}>{title}</span>
-          </div>
-          <div className="md:mt-0 text-right md:text-left">
-            {number}
-            <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 hidden md:block">{sub}</p>
-          </div>
+    <Card className="border-border shadow-sm flex-1 flex flex-col justify-center">
+      <CardContent className="flex items-center gap-4 px-5 py-4 h-full">
+        <div className={`p-2.5 rounded-xl bg-muted/60 shrink-0`}>
+          <Icon className={`w-5 h-5 ${color}`} />
         </div>
-        <p className="text-[10px] text-muted-foreground mt-0.5 md:hidden">{sub}</p>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className={`text-xs font-semibold uppercase tracking-wide ${color}`}>{title}</span>
+          {display}
+          <span className="text-xs text-muted-foreground truncate">{sub}</span>
+        </div>
       </CardContent>
     </Card>
   );
@@ -82,14 +73,14 @@ export default function Dashboard() {
   const wishlistedCards = cardsArray.filter((c) => c.isWishlisted).length;
 
   return (
-    <div className="flex flex-col gap-4 md:gap-8 pt-4 md:pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col gap-4 pt-4 md:pt-8 flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-1">Dashboard</h1>
         <p className="text-sm md:text-base text-muted-foreground">Overview of your collection.</p>
       </div>
 
       {dbSetupRequired && (
-        <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 md:p-4 flex items-start gap-2 md:gap-4">
+        <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 md:p-4 flex items-start gap-2 md:gap-4 shrink-0">
           <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm text-amber-800 dark:text-amber-300">Database setup required</p>
@@ -108,8 +99,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 1-column on mobile, 4-column on md+ */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* 1×4 on mobile (flex-col, each card flex-1), 4-col grid on md+ */}
+      <div className="flex flex-col md:grid md:grid-cols-4 gap-3 flex-1 pb-2">
         <StatCard
           title="Total Cards"
           icon={Library}

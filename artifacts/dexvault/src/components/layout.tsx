@@ -133,7 +133,7 @@ export function Layout({ children }: LayoutProps) {
         )}
 
         {/* No top padding — sticky page headers own their own top padding */}
-        <div className="flex-1 max-w-7xl mx-auto w-full px-4 pb-4 md:px-8 md:pb-8">
+        <div className="flex-1 max-w-7xl mx-auto w-full px-4 pb-4 md:px-8 md:pb-8 flex flex-col">
           {children}
         </div>
       </main>

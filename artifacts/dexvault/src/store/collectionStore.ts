@@ -15,6 +15,7 @@ interface CollectionState {
   updateQuantity: (cardId: string, quantity: number, userId: string) => Promise<void>;
   updateCondition: (cardId: string, condition: string, userId: string) => Promise<void>;
   updateVariants: (cardId: string, variants: Record<string, number>, userId: string, cardForCreate?: PokemonCard) => Promise<void>;
+  updateNotes: (cardId: string, notes: string, userId: string) => Promise<void>;
 }
 
 function isTableMissingError(error: { code?: string; message?: string }) {
@@ -337,6 +338,34 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         },
       }));
       toast.error('Could not update condition', { description: error.message });
+    }
+  },
+
+  updateNotes: async (cardId: string, notes: string, userId: string) => {
+    const existing = get().collectionCards[cardId];
+    if (!existing) return;
+
+    set((state) => ({
+      collectionCards: {
+        ...state.collectionCards,
+        [cardId]: { ...existing, notes },
+      },
+    }));
+
+    const { error } = await supabase
+      .from('collection_cards')
+      .update({ notes })
+      .eq('user_id', userId)
+      .eq('card_id', cardId);
+
+    if (error) {
+      set((state) => ({
+        collectionCards: {
+          ...state.collectionCards,
+          [cardId]: { ...existing, notes: existing.notes },
+        },
+      }));
+      toast.error('Could not save notes', { description: error.message });
     }
   },
 
