@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import logoUrl from '@assets/vault_151_LOGO_blackbg_1779627207357.png';
+
 import { Home, Search, Layers, Library, User, Moon, Sun, AlertTriangle } from 'lucide-react';
 import { useTheme } from './theme-provider';
 import { Button } from './ui/button';
@@ -14,7 +14,7 @@ interface LayoutProps {
 function Vault151Logo({ size = 32 }: { size?: number }) {
   return (
     <img
-      src={logoUrl}
+      src="/vault_151_blackbg.png"
       alt="Vault151 logo"
       width={size}
       height={size}
