@@ -11,26 +11,6 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-function Vault151Logo({ size = 32 }: { size?: number }) {
-  return (
-    <img
-      src="/vault_151_blackbg.png"
-      alt="Vault151 logo"
-      width={size}
-      height={size}
-      className="object-contain"
-    />
-  );
-}
-
-function Vault151Wordmark({ className = '', vaultClassName = 'text-foreground' }: { className?: string; vaultClassName?: string }) {
-  return (
-    <span className={`font-bold tracking-tight ${className}`}>
-      <span className={vaultClassName}>Vault</span>
-      <span className="text-red-600 dark:text-red-500">151</span>
-    </span>
-  );
-}
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
@@ -58,9 +38,8 @@ export function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
       <aside className="hidden md:flex flex-col w-64 border-r border-border bg-sidebar px-4 py-6 shrink-0 h-screen sticky top-0">
-        <div className="flex items-center gap-2.5 mb-8 px-2">
-          <Vault151Logo size={32} />
-          <Vault151Wordmark className="text-xl" />
+        <div className="flex items-center mb-8 px-2">
+          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-10 w-auto object-contain" />
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -101,10 +80,7 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1 flex flex-col min-w-0 pb-[72px] md:pb-0 [overflow-x:clip]">
         {/* Mobile top bar — always black */}
         <header className="md:hidden flex items-center justify-between px-4 h-16 bg-black border-b border-black sticky top-0 z-30">
-          <div className="flex items-center gap-2">
-            <Vault151Logo size={28} />
-            <Vault151Wordmark className="text-lg" vaultClassName="text-white" />
-          </div>
+          <img src="/vault_151_blackbg.png" alt="Vault151" className="h-10 w-auto object-contain" />
           <Button
             variant="ghost"
             size="icon"
