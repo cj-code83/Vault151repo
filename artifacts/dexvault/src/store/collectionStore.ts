@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { CollectionCard, PokemonCard } from '../types/pokemon';
 import { supabase } from '../lib/supabase';
+import { writeCardToCache } from '../services/pokemonTcg';
 
 interface CollectionState {
   collectionCards: Record<string, CollectionCard>;
@@ -132,6 +133,9 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
           [card.id]: { ...optimisticCard, id: data.id },
         },
       }));
+      // Cache card data in Supabase so future collection-tab queries
+      // can be served entirely from Supabase without hitting the API.
+      writeCardToCache(card);
     }
   },
 

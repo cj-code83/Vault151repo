@@ -1,0 +1,138 @@
+This is a **critical performance refactor**. The app currently has severe slow loading issues (multi-second to minute delays) due to inefficient data fetching patterns.
+
+This is NOT a UI issue — it is a data-fetching architecture issue.
+
+---
+
+## CORE ARCHITECTURE RULE (NON-NEGOTIABLE)
+
+Supabase must be the PRIMARY runtime data source.
+
+Pokémon TCG API is ONLY a fallback for missing data population.
+
+---
+
+1. SINGLE BATCH QUERY RULE
+
+---
+
+Each list/search page must use:
+
+* EXACTLY ONE Supabase query to fetch all card data
+
+Example:
+SELECT * FROM cards WHERE ...
+
+That query MUST return everything required to render a card:
+
+* id
+* name
+* set_id
+* set_name
+* number
+* rarity
+* image_small
+* image_large
+* set_icon_url
+
+NO additional per-card queries are allowed.
+
+---
+
+2. ABSOLUTE BAN ON PER-CARD FETCHING
+
+---
+
+Remove ANY logic that does:
+
+* fetching per card inside useEffect
+* fetching per card metadata after render
+* fetching set data per card
+* fetching image URLs after initial render
+
+Each card must NOT trigger its own network request.
+
+---
+
+3. REMOVE FETCH WATERFALLS COMPLETELY
+
+---
+
+There must be NO chained loading like:
+collection → metadata → set → image → render
+
+Everything required for initial render must come from the single Supabase query.
+
+---
+
+4. RENDER-FIRST RULE (CRITICAL FOR SPEED)
+
+---
+
+Card grids MUST:
+
+* render immediately once Supabase returns data
+* NOT wait for set icons, tracker logic, or enrichment
+
+ALL secondary data must load AFTER initial render.
+
+No blocking UI dependencies are allowed.
+
+---
+
+5. IMAGE LOADING RULES
+
+---
+
+* Images must load directly from Pokémon TCG CDN URLs
+* No proxying through backend or Supabase
+* No cache-busting query strings
+* No repeated fetch loops or retries
+* Images must not block UI rendering
+
+---
+
+6. SET ICON HANDLING
+
+---
+
+Set icons MUST:
+
+* be included in the same dataset OR fetched once per set globally
+* NOT be fetched per card
+* NOT trigger additional network requests per card render
+
+---
+
+7. PERFORMANCE GOALS
+
+---
+
+After implementation:
+
+* Card list loads in <1 second perceived time
+* ONLY 1 network request per page (Supabase query)
+* No per-card API calls under any circumstances
+* No repeated fetch loops
+* Images load progressively after grid appears
+
+---
+
+8. VERIFY AFTER IMPLEMENTATION
+
+---
+
+After changes, check DevTools Network tab:
+
+* Confirm request count per page is minimal (1–2 max)
+* Confirm no repeated API calls per card
+* Confirm no waterfall chain of requests
+
+---
+
+## PRIORITY ORDER
+
+1. Remove per-card fetching completely
+2. Flatten all data into single Supabase query
+3. Ensure UI renders immediately
+4. Ensure images load independently and progressively
