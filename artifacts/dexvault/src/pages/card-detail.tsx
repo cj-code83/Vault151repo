@@ -33,7 +33,11 @@ export default function CardDetail() {
     queryKey: ['card', cardId],
     queryFn: () => getCard(cardId!),
     enabled: !!cardId,
-    staleTime: 10 * 60 * 1000, // card metadata rarely changes — cache 10 min
+    // Card metadata (name, artist, images, set) never changes; prices update
+    // at most daily.  24 h staleTime means a card visited today is served
+    // from the localStorage persisted cache instantly tomorrow — no spinner,
+    // no network request.
+    staleTime: 24 * 60 * 60 * 1000,
   });
 
   if (isLoading) {
@@ -58,8 +62,7 @@ export default function CardDetail() {
   const owned = user ? collectionCards[card.id] : null;
   const genericQty = owned?.quantity || 0;
   const variantMap = owned?.variants ?? {};
-  const totalQty =
-    genericQty + Object.values(variantMap).reduce((s, v) => s + v, 0);
+  const totalQty = genericQty + Object.values(variantMap).reduce((s, v) => s + v, 0);
 
   const currentNotes = notesValue ?? owned?.notes ?? '';
 
@@ -77,8 +80,7 @@ export default function CardDetail() {
     await updateNotes(card.id, notesValue, user.id);
   };
 
-  // Variants derived from real TCGPlayer price keys — only real printings shown
-  const prices = card.tcgplayer?.prices ?? {};
+  // Only show variants that genuinely exist for this card (from TCGPlayer keys)
   const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
 
   const trackedVariantLetters = [
@@ -106,7 +108,6 @@ export default function CardDetail() {
             />
           </motion.div>
 
-          {/* Variant letter badges on detail image */}
           {trackedVariantLetters.length > 0 && (
             <div className="absolute -top-2 -left-2 flex gap-1">
               {trackedVariantLetters.map((letter, i) => (
@@ -228,7 +229,7 @@ export default function CardDetail() {
           )}
         </div>
 
-        {/* Variants & Pricing — only real printings from TCGPlayer data */}
+        {/* Variants & Pricing — only real TCGPlayer printings */}
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="font-semibold text-sm mb-1 text-green-700 dark:text-green-400">
@@ -246,11 +247,9 @@ export default function CardDetail() {
                   const qty = variantMap[key] ?? 0;
                   return (
                     <div key={key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                      {/* Letter badge */}
                       <div className="w-6 h-6 rounded-full bg-yellow-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm">
                         {letter}
                       </div>
-
                       <div className="flex-1 min-w-0">
                         <span className="font-medium text-sm">{label}</span>
                         {price != null ? (
@@ -261,7 +260,6 @@ export default function CardDetail() {
                           <span className="ml-2 text-xs text-muted-foreground">no price data</span>
                         )}
                       </div>
-
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Button
                           variant="outline"
@@ -291,17 +289,11 @@ export default function CardDetail() {
               </div>
             )}
 
-            {/* Legacy / non-standard tracked variants — show so user can zero them out */}
+            {/* Legacy variants (tracked before this fix) — show so user can zero them */}
             {Object.entries(variantMap)
-              .filter(
-                ([k, qty]) =>
-                  qty > 0 && !availableVariants.some((v) => v.key === k)
-              )
+              .filter(([k, qty]) => qty > 0 && !availableVariants.some((v) => v.key === k))
               .map(([key, qty]) => (
-                <div
-                  key={key}
-                  className="flex items-center gap-3 py-2.5 border-t border-border"
-                >
+                <div key={key} className="flex items-center gap-3 py-2.5 border-t border-border">
                   <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
                     {getVariantLetter(key)}
                   </div>
@@ -310,32 +302,19 @@ export default function CardDetail() {
                     <span className="ml-2 text-xs text-muted-foreground">(legacy)</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleVariantChange(key, -1)}
-                      disabled={!user}
-                    >
+                    <Button variant="outline" size="icon" className="h-7 w-7"
+                      onClick={() => handleVariantChange(key, -1)} disabled={!user}>
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">
-                      {qty}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => handleVariantChange(key, 1)}
-                      disabled={!user}
-                    >
+                    <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">{qty}</span>
+                    <Button variant="outline" size="icon" className="h-7 w-7"
+                      onClick={() => handleVariantChange(key, 1)} disabled={!user}>
                       <Plus className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               ))}
 
-            {/* Variant totals */}
             {Object.values(variantMap).some((v) => v > 0) && (
               <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">

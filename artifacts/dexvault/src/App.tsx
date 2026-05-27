@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,24 +20,26 @@ import CardDetail from "@/pages/card-detail";
 import ScanPage from "@/pages/scan";
 import { useAuth } from "@/hooks/use-auth";
 import { useCollectionStore } from "@/store/collectionStore";
+import { localStoragePersister, CACHE_BUSTER } from "@/lib/queryPersister";
 
-// ─── React Query client ───────────────────────────────────────────────────
-// Global defaults that reduce redundant API calls across the app.
+// ─── React Query client ────────────────────────────────────────────────────
+// gcTime is set to 24 h so that the persister has a chance to write every
+// query to localStorage before it is garbage-collected from memory.
+// Without this, a query could be evicted from memory before the serialiser
+// runs, leaving an incomplete picture in localStorage.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,       // Data is fresh for 5 min — no refetch on revisit
-      gcTime:    30 * 60 * 1000,       // Keep unused cache 30 min (was cacheTime)
-      retry: 1,                         // One retry on failure (API blip)
-      refetchOnWindowFocus: false,      // Don't refetch just because the user switched tabs
-      refetchOnReconnect: false,        // Don't refetch on network reconnect
+      staleTime: 5 * 60 * 1000,       // 5 min — reuse data without refetching
+      gcTime:    24 * 60 * 60 * 1000, // 24 h — keep in memory so persister can save it
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
   },
 });
 
-// ─── Scroll to top on navigation ─────────────────────────────────────────
-// Fires after every Wouter location change so pages always open at the top.
-// Uses 'instant' to avoid the jarring flash of a smooth scroll mid-animation.
+// ─── Scroll to top on navigation ──────────────────────────────────────────
 function ScrollToTop() {
   const [location] = useLocation();
   useEffect(() => {
@@ -45,21 +48,19 @@ function ScrollToTop() {
   return null;
 }
 
-// ─── Collection hydration ─────────────────────────────────────────────────
+// ─── Collection hydration ──────────────────────────────────────────────────
 function CollectionInitializer() {
   const { user } = useAuth();
   const fetchCollection = useCollectionStore((s) => s.fetchCollection);
 
   useEffect(() => {
-    if (user) {
-      fetchCollection(user.id);
-    }
+    if (user) fetchCollection(user.id);
   }, [user?.id, fetchCollection]);
 
   return null;
 }
 
-// ─── Auth guard ───────────────────────────────────────────────────────────
+// ─── Auth guard ────────────────────────────────────────────────────────────
 const ProtectedRoute = ({ component: Component, ...rest }: any) => {
   const { user, loading } = useAuth();
 
@@ -71,14 +72,11 @@ const ProtectedRoute = ({ component: Component, ...rest }: any) => {
     );
   }
 
-  if (!user) {
-    return <Redirect to="/" />;
-  }
-
+  if (!user) return <Redirect to="/" />;
   return <Component {...rest} />;
 };
 
-// ─── Router ───────────────────────────────────────────────────────────────
+// ─── Router ────────────────────────────────────────────────────────────────
 function Router() {
   return (
     <Layout>
@@ -100,11 +98,26 @@ function Router() {
   );
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────
+// ─── Root ──────────────────────────────────────────────────────────────────
+// PersistQueryClientProvider replaces the plain QueryClientProvider.
+// It transparently saves the React Query cache to localStorage and restores
+// it on next load — so previously fetched cards, sets, and search results
+// appear instantly without any network request.
+//
+// maxAge: 24 h — cached data older than this is ignored and re-fetched.
+// buster: version string — changing this instantly clears all clients' cache
+//         if a breaking schema change is deployed.
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="dexvault-theme">
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister: localStoragePersister,
+          maxAge: 24 * 60 * 60 * 1000,
+          buster: CACHE_BUSTER,
+        }}
+      >
         <TooltipProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
@@ -112,7 +125,7 @@ function App() {
           <Toaster />
           <SonnerToaster richColors position="bottom-right" />
         </TooltipProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </ThemeProvider>
   );
 }
