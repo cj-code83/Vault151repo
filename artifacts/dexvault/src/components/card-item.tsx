@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { PokemonCard } from '@/types/pokemon';
 import { useCollectionStore } from '@/store/collectionStore';
 import { useAuth } from '@/hooks/use-auth';
@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'wouter';
-import { getVariantLetter } from '@/utils/variants';
+import { getAvailableVariants, getVariantLetter } from '@/utils/variants';
 
 interface CardItemProps {
   card: PokemonCard;
@@ -16,19 +16,37 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const { user } = useAuth();
   const { collectionCards, addCard, updateQuantity, removeCard } = useCollectionStore();
 
+  // Image loading state — prevents the browser's top-to-bottom progressive JPEG render
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Handle images that are already in the browser cache (onLoad won't fire after mount)
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setImgLoaded(true);
+    }
+  }, [card.images.small]);
+
   const owned = user ? collectionCards[card.id] : null;
   const genericQty = owned?.quantity || 0;
   const variantMap = owned?.variants ?? {};
   const variantQty = Object.values(variantMap).reduce((s, v) => s + v, 0);
   const totalQty = genericQty + variantQty;
 
-  const trackedVariantLetters = [
-    ...new Set(
-      Object.entries(variantMap)
-        .filter(([, qty]) => qty > 0)
-        .map(([key]) => getVariantLetter(key))
-    ),
-  ].slice(0, 4);
+  // Single-variant cards (e.g. secret rares that only exist as holofoil) have
+  // no meaningful variant distinction — suppress the letter badges.
+  const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
+  const isSingleVariant = availableVariants.length === 1;
+
+  const trackedVariantLetters = isSingleVariant
+    ? []
+    : [
+        ...new Set(
+          Object.entries(variantMap)
+            .filter(([, qty]) => qty > 0)
+            .map(([key]) => getVariantLetter(key))
+        ),
+      ].slice(0, 4);
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -61,11 +79,19 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
       >
         <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-2 relative aspect-[63/88]">
+            {/* Spinner shown while image hasn't decoded */}
+            {!imgLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-md">
+                <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              </div>
+            )}
             <img
+              ref={imgRef}
               src={card.images.small}
               alt={card.name}
-              className="w-full h-full object-contain drop-shadow-md"
+              className={`w-full h-full object-contain drop-shadow-md transition-opacity duration-150 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
               decoding="async"
+              onLoad={() => setImgLoaded(true)}
             />
           </CardContent>
         </Card>
@@ -77,7 +103,7 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
           </div>
         )}
 
-        {/* Gold variant letter badges — top left, stacked */}
+        {/* Gold variant letter badges — only shown for multi-variant cards */}
         {trackedVariantLetters.map((letter, i) => (
           <div
             key={letter + i}
