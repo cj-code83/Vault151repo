@@ -54,6 +54,10 @@ export default function Search() {
 
   const debouncedSearch = useDebounce(searchTerm, 400);
 
+  // Radix Select forbids empty-string values, so we use a sentinel for "no filter"
+  const NONE = '__none__';
+  const toFilter = (v: string) => (v === NONE ? '' : v);
+
   const activeFilterCount = [filterSetId, filterType, filterRarity].filter(Boolean).length;
   const hasActiveFilter   = activeFilterCount > 0;
   const isFiltering       = debouncedSearch.trim().length > 0 || hasActiveFilter;
@@ -161,12 +165,15 @@ export default function Search() {
             {/* Set filter */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Set</p>
-              <Select value={filterSetId} onValueChange={setFilterSetId}>
+              <Select
+                value={filterSetId || NONE}
+                onValueChange={(v) => setFilterSetId(toFilter(v))}
+              >
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Any set" />
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
-                  <SelectItem value="">Any set</SelectItem>
+                  <SelectItem value={NONE}>Any set</SelectItem>
                   {groupedSets.map(({ series, items }) => (
                     <SelectGroup key={series}>
                       <SelectLabel className="text-xs">{series}</SelectLabel>
@@ -184,12 +191,15 @@ export default function Search() {
             {/* Type filter */}
             <div className="flex-1 min-w-[130px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Type</p>
-              <Select value={filterType} onValueChange={setFilterType}>
+              <Select
+                value={filterType || NONE}
+                onValueChange={(v) => setFilterType(toFilter(v))}
+              >
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Any type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any type</SelectItem>
+                  <SelectItem value={NONE}>Any type</SelectItem>
                   {POKEMON_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
@@ -200,12 +210,15 @@ export default function Search() {
             {/* Rarity filter */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Rarity</p>
-              <Select value={filterRarity} onValueChange={setFilterRarity}>
+              <Select
+                value={filterRarity || NONE}
+                onValueChange={(v) => setFilterRarity(toFilter(v))}
+              >
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Any rarity" />
                 </SelectTrigger>
                 <SelectContent className="max-h-72">
-                  <SelectItem value="">Any rarity</SelectItem>
+                  <SelectItem value={NONE}>Any rarity</SelectItem>
                   {RARITIES.map((r) => (
                     <SelectItem key={r} value={r}>{r}</SelectItem>
                   ))}
