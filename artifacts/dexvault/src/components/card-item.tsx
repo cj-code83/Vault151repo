@@ -8,6 +8,9 @@ import { motion } from 'framer-motion';
 import { Link } from 'wouter';
 import { getAvailableVariants, getVariantLetter } from '@/utils/variants';
 
+// Standard keys are never shown as variant badges — they are the default printing.
+const STANDARD_KEYS = new Set(['normal', 'unlimitedNormal']);
+
 interface CardItemProps {
   card: PokemonCard;
 }
@@ -16,37 +19,38 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const { user } = useAuth();
   const { collectionCards, addCard, updateQuantity, removeCard } = useCollectionStore();
 
-  // Image loading state — prevents the browser's top-to-bottom progressive JPEG render
+  // Show a spinner until the image has fully decoded.
+  // This prevents the jarring top-to-bottom JPEG progressive render.
   const [imgLoaded, setImgLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Handle images that are already in the browser cache (onLoad won't fire after mount)
+  // Images already in the browser cache are "complete" synchronously on mount.
   useEffect(() => {
     if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
       setImgLoaded(true);
     }
   }, [card.images.small]);
 
-  const owned = user ? collectionCards[card.id] : null;
+  const owned      = user ? collectionCards[card.id] : null;
   const genericQty = owned?.quantity || 0;
   const variantMap = owned?.variants ?? {};
   const variantQty = Object.values(variantMap).reduce((s, v) => s + v, 0);
-  const totalQty = genericQty + variantQty;
+  const totalQty   = genericQty + variantQty;
 
-  // Single-variant cards (e.g. secret rares that only exist as holofoil) have
-  // no meaningful variant distinction — suppress the letter badges.
+  // Variant letter badges: only show for non-standard variants the user is tracking.
+  // Standard (normal / unlimitedNormal) copies are implicit and need no badge.
   const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
-  const isSingleVariant = availableVariants.length === 1;
+  const hasNonStdVariants = availableVariants.some((v) => !STANDARD_KEYS.has(v.key));
 
-  const trackedVariantLetters = isSingleVariant
-    ? []
-    : [
+  const trackedVariantLetters = hasNonStdVariants
+    ? [
         ...new Set(
           Object.entries(variantMap)
-            .filter(([, qty]) => qty > 0)
-            .map(([key]) => getVariantLetter(key))
+            .filter(([k, qty]) => qty > 0 && !STANDARD_KEYS.has(k))
+            .map(([k]) => getVariantLetter(k))
         ),
-      ].slice(0, 4);
+      ].slice(0, 4)
+    : [];
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -79,7 +83,7 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
       >
         <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-2 relative aspect-[63/88]">
-            {/* Spinner shown while image hasn't decoded */}
+            {/* Spinner shown while the image hasn't decoded yet */}
             {!imgLoaded && (
               <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-md">
                 <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -103,7 +107,7 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
           </div>
         )}
 
-        {/* Gold variant letter badges — only shown for multi-variant cards */}
+        {/* Gold variant letter badges — only for non-standard tracked variants */}
         {trackedVariantLetters.map((letter, i) => (
           <div
             key={letter + i}
