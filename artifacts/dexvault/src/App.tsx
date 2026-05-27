@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
@@ -20,8 +20,32 @@ import ScanPage from "@/pages/scan";
 import { useAuth } from "@/hooks/use-auth";
 import { useCollectionStore } from "@/store/collectionStore";
 
-const queryClient = new QueryClient();
+// ─── React Query client ───────────────────────────────────────────────────
+// Global defaults that reduce redundant API calls across the app.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,       // Data is fresh for 5 min — no refetch on revisit
+      gcTime:    30 * 60 * 1000,       // Keep unused cache 30 min (was cacheTime)
+      retry: 1,                         // One retry on failure (API blip)
+      refetchOnWindowFocus: false,      // Don't refetch just because the user switched tabs
+      refetchOnReconnect: false,        // Don't refetch on network reconnect
+    },
+  },
+});
 
+// ─── Scroll to top on navigation ─────────────────────────────────────────
+// Fires after every Wouter location change so pages always open at the top.
+// Uses 'instant' to avoid the jarring flash of a smooth scroll mid-animation.
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }, [location]);
+  return null;
+}
+
+// ─── Collection hydration ─────────────────────────────────────────────────
 function CollectionInitializer() {
   const { user } = useAuth();
   const fetchCollection = useCollectionStore((s) => s.fetchCollection);
@@ -35,6 +59,7 @@ function CollectionInitializer() {
   return null;
 }
 
+// ─── Auth guard ───────────────────────────────────────────────────────────
 const ProtectedRoute = ({ component: Component, ...rest }: any) => {
   const { user, loading } = useAuth();
 
@@ -53,9 +78,11 @@ const ProtectedRoute = ({ component: Component, ...rest }: any) => {
   return <Component {...rest} />;
 };
 
+// ─── Router ───────────────────────────────────────────────────────────────
 function Router() {
   return (
     <Layout>
+      <ScrollToTop />
       <CollectionInitializer />
       <Switch>
         <Route path="/" component={Landing} />
@@ -73,6 +100,7 @@ function Router() {
   );
 }
 
+// ─── Root ─────────────────────────────────────────────────────────────────
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="dexvault-theme">

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { PokemonCard } from '@/types/pokemon';
 import { useCollectionStore } from '@/store/collectionStore';
 import { useAuth } from '@/hooks/use-auth';
@@ -11,7 +12,7 @@ interface CardItemProps {
   card: PokemonCard;
 }
 
-export function CardItem({ card }: CardItemProps) {
+export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const { user } = useAuth();
   const { collectionCards, addCard, updateQuantity, removeCard } = useCollectionStore();
 
@@ -65,6 +66,7 @@ export function CardItem({ card }: CardItemProps) {
               alt={card.name}
               className="w-full h-full object-contain drop-shadow-md"
               loading="lazy"
+              decoding="async"
             />
           </CardContent>
         </Card>
@@ -109,4 +111,4 @@ export function CardItem({ card }: CardItemProps) {
       </motion.div>
     </Link>
   );
-}
+});

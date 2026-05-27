@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Minus, Star, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { PRESET_VARIANTS, getPresetPrice, getVariantLetter } from '@/utils/variants';
+import { getAvailableVariants, getVariantLetter, formatVariantName } from '@/utils/variants';
 
 export default function CardDetail() {
   const [, params] = useRoute('/card/:id');
@@ -33,6 +33,7 @@ export default function CardDetail() {
     queryKey: ['card', cardId],
     queryFn: () => getCard(cardId!),
     enabled: !!cardId,
+    staleTime: 10 * 60 * 1000, // card metadata rarely changes — cache 10 min
   });
 
   if (isLoading) {
@@ -76,7 +77,9 @@ export default function CardDetail() {
     await updateNotes(card.id, notesValue, user.id);
   };
 
+  // Variants derived from real TCGPlayer price keys — only real printings shown
   const prices = card.tcgplayer?.prices ?? {};
+  const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
 
   const trackedVariantLetters = [
     ...new Set(
@@ -95,7 +98,12 @@ export default function CardDetail() {
             whileHover={{ rotateY: 10, rotateX: 5, scale: 1.05 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
-            <img src={card.images.large} alt={card.name} className="w-full h-auto drop-shadow-2xl" />
+            <img
+              src={card.images.large}
+              alt={card.name}
+              className="w-full h-auto drop-shadow-2xl"
+              decoding="async"
+            />
           </motion.div>
 
           {/* Variant letter badges on detail image */}
@@ -197,7 +205,13 @@ export default function CardDetail() {
         <div className="grid sm:grid-cols-2 gap-4">
           <Card className="border-border">
             <CardContent className="p-4 flex items-center gap-4">
-              <img src={card.set.images.symbol} alt={card.set.name} className="w-8 h-8 object-contain" />
+              <img
+                src={card.set.images.symbol}
+                alt={card.set.name}
+                className="w-8 h-8 object-contain"
+                loading="lazy"
+                decoding="async"
+              />
               <div>
                 <div className="font-semibold text-sm">Set</div>
                 <div className="text-muted-foreground">{card.set.name}</div>
@@ -214,77 +228,85 @@ export default function CardDetail() {
           )}
         </div>
 
-        {/* Variants & Pricing — preset list */}
+        {/* Variants & Pricing — only real printings from TCGPlayer data */}
         <Card className="border-border">
           <CardContent className="p-4">
-            <div className="font-semibold text-sm mb-3 text-green-700 dark:text-green-400">
+            <div className="font-semibold text-sm mb-1 text-green-700 dark:text-green-400">
               Variants &amp; Pricing
             </div>
-            <div className="divide-y divide-border">
-              {PRESET_VARIANTS.map(({ key, label, letter }) => {
-                const qty = variantMap[key] ?? 0;
-                const price = getPresetPrice(key, prices);
-                return (
-                  <div key={key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                    {/* Letter badge */}
-                    <div className="w-6 h-6 rounded-full bg-yellow-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm">
-                      {letter}
-                    </div>
 
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm">{label}</span>
-                      {key !== 'promo_stamped' && price != null ? (
-                        <span className="ml-2 text-sm font-mono text-green-600 dark:text-green-400">
-                          ${price.toFixed(2)}
+            {availableVariants.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">
+                No variant pricing data available for this card. Use the Notes field to record
+                special prints or condition details.
+              </p>
+            ) : (
+              <div className="divide-y divide-border">
+                {availableVariants.map(({ key, label, letter, price }) => {
+                  const qty = variantMap[key] ?? 0;
+                  return (
+                    <div key={key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                      {/* Letter badge */}
+                      <div className="w-6 h-6 rounded-full bg-yellow-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm">
+                        {letter}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-sm">{label}</span>
+                        {price != null ? (
+                          <span className="ml-2 text-sm font-mono text-green-600 dark:text-green-400">
+                            ${price.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="ml-2 text-xs text-muted-foreground">no price data</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleVariantChange(key, -1)}
+                          disabled={!user || qty === 0}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">
+                          {qty}
                         </span>
-                      ) : key !== 'promo_stamped' ? (
-                        <span className="ml-2 text-xs text-muted-foreground">no price data</span>
-                      ) : null}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleVariantChange(key, 1)}
+                          disabled={!user}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleVariantChange(key, -1)}
-                        disabled={!user || qty === 0}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">
-                        {qty}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleVariantChange(key, 1)}
-                        disabled={!user}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Legacy / non-preset tracked variants — show so user can remove them */}
+            {/* Legacy / non-standard tracked variants — show so user can zero them out */}
             {Object.entries(variantMap)
-              .filter(([k, qty]) => qty > 0 && !PRESET_VARIANTS.some((p) => p.key === k))
+              .filter(
+                ([k, qty]) =>
+                  qty > 0 && !availableVariants.some((v) => v.key === k)
+              )
               .map(([key, qty]) => (
                 <div
                   key={key}
-                  className="flex items-center gap-3 py-2.5 border-t border-border first:border-t-0"
+                  className="flex items-center gap-3 py-2.5 border-t border-border"
                 >
                   <div className="w-6 h-6 rounded-full bg-muted text-muted-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
                     {getVariantLetter(key)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="font-medium text-sm">
-                      {key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^\w/, (c) => c.toUpperCase()).trim()}
-                    </span>
+                    <span className="font-medium text-sm">{formatVariantName(key)}</span>
                     <span className="ml-2 text-xs text-muted-foreground">(legacy)</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -297,7 +319,9 @@ export default function CardDetail() {
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">{qty}</span>
+                    <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">
+                      {qty}
+                    </span>
                     <Button
                       variant="outline"
                       size="icon"
@@ -319,8 +343,8 @@ export default function CardDetail() {
                 </span>
                 {(() => {
                   const val = Object.entries(variantMap).reduce((s, [k, q]) => {
-                    const p = getPresetPrice(k, prices) ?? 0;
-                    return s + p * q;
+                    const found = availableVariants.find((v) => v.key === k);
+                    return s + (found?.price ?? 0) * q;
                   }, 0);
                   return val > 0 ? (
                     <span className="font-mono font-bold text-green-600 dark:text-green-400">
