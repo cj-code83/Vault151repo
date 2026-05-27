@@ -13,6 +13,37 @@ import { Plus, Minus, Star, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getAvailableVariants, getVariantLetter, formatVariantName } from '@/utils/variants';
 
+// ─── Value calculation ────────────────────────────────────────────────────
+
+function calcEstimatedValue(
+  variantMap: Record<string, number>,
+  genericQty: number,
+  availableVariants: ReturnType<typeof getAvailableVariants>
+): { total: number; untrackedGeneric: number } {
+  // Value from explicitly tracked variants
+  const variantValue = availableVariants.reduce((sum, v) => {
+    return sum + (variantMap[v.key] ?? 0) * (v.price ?? 0);
+  }, 0);
+
+  // Generic (untracked) copies: only apply a price when exactly one variant
+  // exists so it's unambiguous which printing the copies are.
+  const singleVariantPrice =
+    availableVariants.length === 1 && availableVariants[0].price != null
+      ? availableVariants[0].price
+      : null;
+  const genericValue = singleVariantPrice != null ? genericQty * singleVariantPrice : 0;
+
+  // How many generic copies couldn't be priced (multiple variants → ambiguous)
+  const untrackedGeneric =
+    genericQty > 0 && singleVariantPrice === null && availableVariants.length > 1
+      ? genericQty
+      : 0;
+
+  return { total: variantValue + genericValue, untrackedGeneric };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────
+
 export default function CardDetail() {
   const [, params] = useRoute('/card/:id');
   const cardId = params?.id;
@@ -33,10 +64,6 @@ export default function CardDetail() {
     queryKey: ['card', cardId],
     queryFn: () => getCard(cardId!),
     enabled: !!cardId,
-    // Card metadata (name, artist, images, set) never changes; prices update
-    // at most daily.  24 h staleTime means a card visited today is served
-    // from the localStorage persisted cache instantly tomorrow — no spinner,
-    // no network request.
     staleTime: 24 * 60 * 60 * 1000,
   });
 
@@ -65,6 +92,12 @@ export default function CardDetail() {
   const totalQty = genericQty + Object.values(variantMap).reduce((s, v) => s + v, 0);
 
   const currentNotes = notesValue ?? owned?.notes ?? '';
+  const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
+  const { total: estimatedValue, untrackedGeneric } = calcEstimatedValue(
+    variantMap,
+    genericQty,
+    availableVariants
+  );
 
   const handleVariantChange = async (key: string, delta: number) => {
     if (!user) return;
@@ -80,9 +113,6 @@ export default function CardDetail() {
     await updateNotes(card.id, notesValue, user.id);
   };
 
-  // Only show variants that genuinely exist for this card (from TCGPlayer keys)
-  const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
-
   const trackedVariantLetters = [
     ...new Set(
       Object.entries(variantMap)
@@ -93,6 +123,7 @@ export default function CardDetail() {
 
   return (
     <div className="flex flex-col md:flex-row gap-8 pt-4 md:pt-8 animate-in fade-in duration-500">
+      {/* Card image */}
       <div className="w-full md:w-1/3 lg:w-1/4 shrink-0">
         <div className="relative w-fit">
           <motion.div
@@ -123,27 +154,44 @@ export default function CardDetail() {
         </div>
       </div>
 
+      {/* Details */}
       <div className="flex-1 space-y-6">
-        {/* Header */}
+
+        {/* ── Header ── */}
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-muted-foreground font-mono text-sm">
-              {card.set.id} • {card.number}
+              {card.set.id} · {card.number}
               {card.set.printedTotal ? `/${card.set.printedTotal}` : ''}
             </span>
             {card.rarity && (
-              <Badge variant="secondary" className="font-medium">
-                {card.rarity}
-              </Badge>
+              <Badge variant="secondary" className="font-medium">{card.rarity}</Badge>
             )}
           </div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">{card.name}</h1>
-          <p className="text-xl text-muted-foreground">
+          <h1 className="text-4xl font-bold tracking-tight mb-1">{card.name}</h1>
+          <p className="text-xl text-muted-foreground mb-3">
             {card.supertype} {card.subtypes?.join(' - ')}
           </p>
+
+          {/* ── Estimated value — shown prominently when card is owned ── */}
+          {owned && estimatedValue > 0 && (
+            <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 w-fit">
+              <div>
+                <p className="text-xs text-green-700 dark:text-green-400 font-medium">Est. Value</p>
+                <p className="text-2xl font-bold font-mono text-green-700 dark:text-green-400 leading-none">
+                  ${estimatedValue.toFixed(2)}
+                </p>
+              </div>
+              {untrackedGeneric > 0 && (
+                <p className="text-xs text-muted-foreground self-end pb-0.5">
+                  + {untrackedGeneric} untracked {untrackedGeneric === 1 ? 'copy' : 'copies'}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Collection controls */}
+        {/* ── Collection controls ── */}
         <Card className="border-border bg-card">
           <CardContent className="p-6">
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
@@ -202,7 +250,7 @@ export default function CardDetail() {
           </div>
         )}
 
-        {/* Set & Artist */}
+        {/* ── Set & Artist ── */}
         <div className="grid sm:grid-cols-2 gap-4">
           <Card className="border-border">
             <CardContent className="p-4 flex items-center gap-4">
@@ -229,7 +277,7 @@ export default function CardDetail() {
           )}
         </div>
 
-        {/* Variants & Pricing — only real TCGPlayer printings */}
+        {/* ── Variants & Pricing ── */}
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="font-semibold text-sm mb-1 text-green-700 dark:text-green-400">
@@ -238,8 +286,7 @@ export default function CardDetail() {
 
             {availableVariants.length === 0 ? (
               <p className="text-xs text-muted-foreground py-2">
-                No variant pricing data available for this card. Use the Notes field to record
-                special prints or condition details.
+                No variant pricing data available. Use Notes to record condition or purchase details.
               </p>
             ) : (
               <div className="divide-y divide-border">
@@ -262,21 +309,15 @@ export default function CardDetail() {
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
+                          variant="outline" size="icon" className="h-7 w-7"
                           onClick={() => handleVariantChange(key, -1)}
                           disabled={!user || qty === 0}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">
-                          {qty}
-                        </span>
+                        <span className="w-6 text-center font-mono text-sm font-bold tabular-nums">{qty}</span>
                         <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
+                          variant="outline" size="icon" className="h-7 w-7"
                           onClick={() => handleVariantChange(key, 1)}
                           disabled={!user}
                         >
@@ -289,7 +330,7 @@ export default function CardDetail() {
               </div>
             )}
 
-            {/* Legacy variants (tracked before this fix) — show so user can zero them */}
+            {/* Legacy variants */}
             {Object.entries(variantMap)
               .filter(([k, qty]) => qty > 0 && !availableVariants.some((v) => v.key === k))
               .map(([key, qty]) => (
@@ -315,28 +356,23 @@ export default function CardDetail() {
                 </div>
               ))}
 
+            {/* Variant summary row */}
             {Object.values(variantMap).some((v) => v > 0) && (
               <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
                   {Object.values(variantMap).reduce((s, v) => s + v, 0)} variant copies tracked
                 </span>
-                {(() => {
-                  const val = Object.entries(variantMap).reduce((s, [k, q]) => {
-                    const found = availableVariants.find((v) => v.key === k);
-                    return s + (found?.price ?? 0) * q;
-                  }, 0);
-                  return val > 0 ? (
-                    <span className="font-mono font-bold text-green-600 dark:text-green-400">
-                      ${val.toFixed(2)} est.
-                    </span>
-                  ) : null;
-                })()}
+                {estimatedValue > 0 && (
+                  <span className="font-mono font-bold text-green-600 dark:text-green-400">
+                    ${estimatedValue.toFixed(2)} est.
+                  </span>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Notes — only when card is in collection/wishlist/favourites */}
+        {/* ── Notes ── */}
         {owned && (
           <Card className="border-border">
             <CardContent className="p-4">
