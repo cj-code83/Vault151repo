@@ -1,0 +1,58 @@
+The performance issue is isolated to:
+
+* Pokémon card images loading extremely slowly
+* set icon images (e.g. Fusion Strike, Obsidian Flames, etc.) also loading slowly or delaying rendering
+
+UI/navigation is fast, so no general app performance investigation is needed.
+
+---
+
+## WHAT NEEDS FIXING
+
+1. CARD IMAGE LOADING (CRITICAL)
+
+* Investigate why Pokémon card images are taking extremely long to load (up to 40+ seconds)
+* Ensure images load directly from the Pokémon TCG CDN without delays or blocking logic
+* Check for repeated requests, cache-busting, or unnecessary re-fetching
+* Ensure images are not being requested multiple times per render or navigation
+
+2. SET IMAGE / SET ICON LOADING
+
+* Set icons (e.g. Fusion Strike, Obsidian Flames, etc.) are also loading slowly
+* These should load instantly or near-instantly
+* Ensure set images are:
+
+  * cached properly
+  * not refetched on every render
+  * not blocked by other data dependencies
+
+3. REMOVE ANY RENDER OR FETCH DEPENDENCIES
+
+* Card images and set icons must render immediately without waiting for:
+
+  * metadata
+  * Supabase responses
+  * search results
+* Basic UI (cards + set icons) should display immediately, then enrich after
+
+4. CHECK FOR INFINITE OR DUPLICATE REQUESTS
+
+* Ensure no loops or repeated fetch calls are causing long stalls
+* Ensure React Query / fetch logic is not re-triggering unnecessarily on rerenders
+* Ensure set icons are not being re-fetched for every card in a list
+
+5. OPTIMISE IMAGE BEHAVIOUR
+
+* Use correct image sizes for list vs detail views
+* Ensure browser caching is working correctly for both card images and set icons
+* Ensure no unnecessary query strings are breaking cache hits
+
+---
+
+## EXPECTED OUTCOME
+
+* Card images load progressively and quickly
+* Set icons appear instantly alongside cards
+* No multi-second delays before images appear
+* No repeated network requests for the same assets
+* Smooth scrolling and browsing experience throughout card lists and detail pages

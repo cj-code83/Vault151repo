@@ -39,6 +39,13 @@
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
 
+    <!-- Preconnect to Pokémon TCG image CDN and API so the first image/request
+         doesn't pay a cold DNS + TLS handshake penalty -->
+    <link rel="preconnect" href="https://images.pokemontcg.io" />
+    <link rel="dns-prefetch" href="https://images.pokemontcg.io" />
+    <link rel="preconnect" href="https://api.pokemontcg.io" />
+    <link rel="dns-prefetch" href="https://api.pokemontcg.io" />
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link

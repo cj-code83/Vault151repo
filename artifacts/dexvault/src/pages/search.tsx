@@ -113,11 +113,13 @@ export default function Search() {
   };
 
   const GRID = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
+  // Minimal stagger so cards appear almost instantly — large stagger values
+  // keep images invisible long after they've actually loaded.
   const STAGGER = {
     hidden: { opacity: 0 },
-    show:   { opacity: 1, transition: { staggerChildren: 0.04 } },
+    show:   { opacity: 1, transition: { staggerChildren: 0.012 } },
   };
-  const ITEM = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+  const ITEM = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.15 } } };
 
   return (
     <div className="flex flex-col">

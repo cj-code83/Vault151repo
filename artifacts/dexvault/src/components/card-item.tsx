@@ -65,7 +65,6 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
               src={card.images.small}
               alt={card.name}
               className="w-full h-full object-contain drop-shadow-md"
-              loading="lazy"
               decoding="async"
             />
           </CardContent>

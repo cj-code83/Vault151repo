@@ -127,9 +127,9 @@ export default function SetDetail() {
             {allCards.map((card, i) => (
               <motion.div
                 key={card.id}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: Math.min(i * 0.01, 0.3) }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.12, delay: Math.min(i * 0.005, 0.15) }}
               >
                 <CardItem card={card} />
               </motion.div>

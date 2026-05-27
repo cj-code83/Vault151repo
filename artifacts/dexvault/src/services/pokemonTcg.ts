@@ -75,7 +75,12 @@ export async function searchCards(params: {
 }
 
 export async function getCard(id: string): Promise<PokemonCard> {
-  const cached = await readCardFromCache(id);
+  // Race the Supabase cache against a 250 ms timeout so a slow DB never
+  // blocks the card detail page from loading.
+  const cached = await Promise.race([
+    readCardFromCache(id),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 250)),
+  ]);
   if (cached) return cached;
 
   const res = await fetch(`${BASE_URL}/cards/${id}`, { headers: headers() });
@@ -83,7 +88,7 @@ export async function getCard(id: string): Promise<PokemonCard> {
   const json = await res.json();
   const card = json.data as PokemonCard;
 
-  writeCardToCache(card);
+  writeCardToCache(card); // fire-and-forget
   return card;
 }
 
