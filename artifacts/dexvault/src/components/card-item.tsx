@@ -93,8 +93,9 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
               ref={imgRef}
               src={card.images.small}
               alt={card.name}
-              className={`w-full h-full object-contain drop-shadow-md transition-opacity duration-150 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+              loading="lazy"
               decoding="async"
+              className={`w-full h-full object-contain drop-shadow-md transition-opacity duration-150 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImgLoaded(true)}
             />
           </CardContent>

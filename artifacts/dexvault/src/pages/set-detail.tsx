@@ -10,7 +10,7 @@ import { useCollectionStore } from '@/store/collectionStore';
 import { PokemonCard } from '@/types/pokemon';
 import { useEffect, useState } from 'react';
 
-const PAGE_SIZE = 250;
+const PAGE_SIZE = 24;
 
 export default function SetDetail() {
   const { id: setId } = useParams<{ id: string }>();
