@@ -36,12 +36,13 @@ const RARITIES = [
   'ACE SPEC Rare',
 ];
 
-// Group sets by series for the dropdown
 const SERIES_ORDER = [
   'Scarlet & Violet', 'Sword & Shield', 'Sun & Moon', 'XY',
   'Black & White', 'HeartGold & SoulSilver', 'Diamond & Pearl',
   'Platinum', 'EX', 'e-Card', 'Neo', 'Gym', 'Base',
 ];
+
+const GRID = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
@@ -54,8 +55,7 @@ export default function Search() {
 
   const debouncedSearch = useDebounce(searchTerm, 400);
 
-  // Radix Select forbids empty-string values, so we use a sentinel for "no filter"
-  const NONE = '__none__';
+  const NONE     = '__none__';
   const toFilter = (v: string) => (v === NONE ? '' : v);
 
   const activeFilterCount = [filterSetId, filterType, filterRarity].filter(Boolean).length;
@@ -73,20 +73,23 @@ export default function Search() {
       pageSize: 24,
     }),
     enabled: isFiltering,
-    staleTime: 60_000,
+    // 10 minutes: search results are stable; prevents hammering the API on every
+    // revisit and keeps the grid populated from the localStorage persisted cache.
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: trending, isLoading: trendingLoading } = useQuery({
     queryKey: ['trending-cards'],
     queryFn: getTrendingCards,
     enabled: !isFiltering,
-    staleTime: 1000 * 60 * 15,
+    // 60 minutes: trending cards don't change frequently.
+    staleTime: 60 * 60 * 1000,
   });
 
   const { data: sets } = useQuery({
     queryKey: ['sets'],
     queryFn: getSets,
-    staleTime: 3_600_000,
+    staleTime: 24 * 60 * 60 * 1000,
   });
 
   // ── Group sets by series for the filter dropdown ──────────────────────
@@ -111,15 +114,6 @@ export default function Search() {
     setFilterType('');
     setFilterRarity('');
   };
-
-  const GRID = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
-  // Minimal stagger so cards appear almost instantly — large stagger values
-  // keep images invisible long after they've actually loaded.
-  const STAGGER = {
-    hidden: { opacity: 0 },
-    show:   { opacity: 1, transition: { staggerChildren: 0.012 } },
-  };
-  const ITEM = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0, transition: { duration: 0.15 } } };
 
   return (
     <div className="flex flex-col">
@@ -164,25 +158,17 @@ export default function Search() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-wrap gap-2 items-end"
           >
-            {/* Set filter */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Set</p>
-              <Select
-                value={filterSetId || NONE}
-                onValueChange={(v) => setFilterSetId(toFilter(v))}
-              >
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Any set" />
-                </SelectTrigger>
+              <Select value={filterSetId || NONE} onValueChange={(v) => setFilterSetId(toFilter(v))}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Any set" /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   <SelectItem value={NONE}>Any set</SelectItem>
                   {groupedSets.map(({ series, items }) => (
                     <SelectGroup key={series}>
                       <SelectLabel className="text-xs">{series}</SelectLabel>
                       {items.map((s) => (
-                        <SelectItem key={s.id} value={s.id} className="text-sm">
-                          {s.name}
-                        </SelectItem>
+                        <SelectItem key={s.id} value={s.id} className="text-sm">{s.name}</SelectItem>
                       ))}
                     </SelectGroup>
                   ))}
@@ -190,52 +176,30 @@ export default function Search() {
               </Select>
             </div>
 
-            {/* Type filter */}
             <div className="flex-1 min-w-[130px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Type</p>
-              <Select
-                value={filterType || NONE}
-                onValueChange={(v) => setFilterType(toFilter(v))}
-              >
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Any type" />
-                </SelectTrigger>
+              <Select value={filterType || NONE} onValueChange={(v) => setFilterType(toFilter(v))}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Any type" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Any type</SelectItem>
-                  {POKEMON_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
+                  {POKEMON_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Rarity filter */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Rarity</p>
-              <Select
-                value={filterRarity || NONE}
-                onValueChange={(v) => setFilterRarity(toFilter(v))}
-              >
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Any rarity" />
-                </SelectTrigger>
+              <Select value={filterRarity || NONE} onValueChange={(v) => setFilterRarity(toFilter(v))}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Any rarity" /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   <SelectItem value={NONE}>Any rarity</SelectItem>
-                  {RARITIES.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                  ))}
+                  {RARITIES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Clear button */}
             {hasActiveFilter && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 gap-1.5 text-muted-foreground hover:text-foreground self-end"
-                onClick={clearFilters}
-              >
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground hover:text-foreground self-end" onClick={clearFilters}>
                 <X className="h-3.5 w-3.5" />
                 Clear
               </Button>
@@ -243,46 +207,39 @@ export default function Search() {
           </motion.div>
         )}
 
-        {/* Active filter chips (shown even when panel is collapsed) */}
+        {/* Active filter chips */}
         {hasActiveFilter && !showFilters && (
           <div className="flex flex-wrap gap-1.5">
             {filterSetId && sets && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 {sets.find((s) => s.id === filterSetId)?.name ?? filterSetId}
-                <button onClick={() => setFilterSetId('')} className="hover:text-destructive ml-0.5">
-                  <X className="h-3 w-3" />
-                </button>
+                <button onClick={() => setFilterSetId('')} className="hover:text-destructive ml-0.5"><X className="h-3 w-3" /></button>
               </Badge>
             )}
             {filterType && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 {filterType}
-                <button onClick={() => setFilterType('')} className="hover:text-destructive ml-0.5">
-                  <X className="h-3 w-3" />
-                </button>
+                <button onClick={() => setFilterType('')} className="hover:text-destructive ml-0.5"><X className="h-3 w-3" /></button>
               </Badge>
             )}
             {filterRarity && (
               <Badge variant="secondary" className="gap-1 text-xs">
                 {filterRarity}
-                <button onClick={() => setFilterRarity('')} className="hover:text-destructive ml-0.5">
-                  <X className="h-3 w-3" />
-                </button>
+                <button onClick={() => setFilterRarity('')} className="hover:text-destructive ml-0.5"><X className="h-3 w-3" /></button>
               </Badge>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Results area ── */}
+      {/* ── Results ── */}
       <div className="pt-6">
         {isError && (
           <div className="p-4 bg-destructive/10 text-destructive rounded-md border border-destructive/20 mb-4">
-            Error searching cards: {(error as Error).message}
+            Error: {(error as Error).message}
           </div>
         )}
 
-        {/* Search / filter results */}
         {isFiltering && (
           isLoading ? (
             <div className={GRID}>
@@ -295,17 +252,16 @@ export default function Search() {
               No cards found — try adjusting your search or filters.
             </div>
           ) : (
-            <motion.div className={GRID} initial="hidden" animate="show" variants={STAGGER}>
+            // No stagger — all cards render instantly when data arrives.
+            // Individual card images fade in as they load via CardItem's internal state.
+            <div className={GRID}>
               {data?.data.map((card) => (
-                <motion.div key={card.id} variants={ITEM}>
-                  <CardItem card={card} />
-                </motion.div>
+                <CardItem key={card.id} card={card} />
               ))}
-            </motion.div>
+            </div>
           )
         )}
 
-        {/* Trending — shown when nothing is searched/filtered */}
         {!isFiltering && (
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -320,13 +276,11 @@ export default function Search() {
                 ))}
               </div>
             ) : (
-              <motion.div className={GRID} initial="hidden" animate="show" variants={STAGGER}>
+              <div className={GRID}>
                 {(trending ?? []).map((card) => (
-                  <motion.div key={card.id} variants={ITEM}>
-                    <CardItem card={card} />
-                  </motion.div>
+                  <CardItem key={card.id} card={card} />
                 ))}
-              </motion.div>
+              </div>
             )}
           </div>
         )}

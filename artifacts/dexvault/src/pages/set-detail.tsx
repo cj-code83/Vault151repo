@@ -4,13 +4,12 @@ import { searchCards, getSets } from '@/services/pokemonTcg';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { CardItem } from '@/components/card-item';
 import { useCollectionStore } from '@/store/collectionStore';
 import { PokemonCard } from '@/types/pokemon';
 import { useEffect, useState } from 'react';
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 250;
 
 export default function SetDetail() {
   const { id: setId } = useParams<{ id: string }>();
@@ -21,7 +20,7 @@ export default function SetDetail() {
   const { data: setsData } = useQuery({
     queryKey: ['sets'],
     queryFn: getSets,
-    staleTime: 3600000,
+    staleTime: 24 * 60 * 60 * 1000,
   });
 
   const set = setsData?.find((s) => s.id === setId);
@@ -29,7 +28,9 @@ export default function SetDetail() {
   const { data: page1, isLoading, isError } = useQuery({
     queryKey: ['set-cards-all', setId],
     queryFn: () => searchCards({ q: `set.id:${setId}`, page: 1, pageSize: PAGE_SIZE }),
-    staleTime: 1000 * 60 * 30,
+    // 2 hours: set contents never change, and results are batch-written to
+    // Supabase card_cache on every fetch so collection tabs are pre-populated.
+    staleTime: 2 * 60 * 60 * 1000,
     enabled: !!setId,
   });
 
@@ -38,7 +39,7 @@ export default function SetDetail() {
   const { data: page2 } = useQuery({
     queryKey: ['set-cards-all', setId, 2],
     queryFn: () => searchCards({ q: `set.id:${setId}`, page: 2, pageSize: PAGE_SIZE }),
-    staleTime: 1000 * 60 * 30,
+    staleTime: 2 * 60 * 60 * 1000,
     enabled: needsPage2,
   });
 
@@ -59,13 +60,7 @@ export default function SetDetail() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setLocation('/sets')}
-          data-testid="button-back-to-sets"
-          className="shrink-0"
-        >
+        <Button variant="ghost" size="icon" onClick={() => setLocation('/sets')} className="shrink-0">
           <ChevronLeft className="w-5 h-5" />
         </Button>
         <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -74,16 +69,12 @@ export default function SetDetail() {
               src={set.images.logo}
               alt={set.name}
               className="h-10 object-contain shrink-0 max-w-[120px]"
-              onError={(e) => {
-                if (set.images.symbol) (e.target as HTMLImageElement).src = set.images.symbol;
-              }}
+              onError={(e) => { if (set.images.symbol) (e.target as HTMLImageElement).src = set.images.symbol; }}
             />
           )}
           <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight truncate">{set?.name ?? setId}</h1>
-            {set && (
-              <p className="text-sm text-muted-foreground">{set.series} · {set.releaseDate}</p>
-            )}
+            {set && <p className="text-sm text-muted-foreground">{set.series} · {set.releaseDate}</p>}
           </div>
         </div>
       </div>
@@ -113,9 +104,7 @@ export default function SetDetail() {
         </div>
       )}
 
-      {isError && (
-        <div className="text-destructive text-sm">Failed to load cards for this set.</div>
-      )}
+      {isError && <div className="text-destructive text-sm">Failed to load cards for this set.</div>}
 
       {!isLoading && allCards.length > 0 && (
         <>
@@ -123,16 +112,10 @@ export default function SetDetail() {
             {page1?.totalCount ?? allCards.length} cards in set
             {needsPage2 && !page2 && <span className="ml-2 text-primary animate-pulse">Loading more…</span>}
           </div>
+          {/* No per-card animation — all cards render instantly, images load via CardItem */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {allCards.map((card, i) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.12, delay: Math.min(i * 0.005, 0.15) }}
-              >
-                <CardItem card={card} />
-              </motion.div>
+            {allCards.map((card) => (
+              <CardItem key={card.id} card={card} />
             ))}
           </div>
         </>
