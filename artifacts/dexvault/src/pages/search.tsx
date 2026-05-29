@@ -47,34 +47,41 @@ const GRID = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:g
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function Search() {
-  const [searchTerm, setSearchTerm]     = useState('');
-  const [filterSetId, setFilterSetId]   = useState('');
-  const [filterType, setFilterType]     = useState('');
-  const [filterRarity, setFilterRarity] = useState('');
-  const [showFilters, setShowFilters]   = useState(false);
+  const [searchTerm, setSearchTerm]       = useState('');
+  const [filterSetId, setFilterSetId]     = useState('');
+  const [filterType, setFilterType]       = useState('');
+  const [filterRarity, setFilterRarity]   = useState('');
+  const [filterNumber, setFilterNumber]   = useState('');
+  const [showFilters, setShowFilters]     = useState(false);
 
   const debouncedSearch = useDebounce(searchTerm, 400);
+  const debouncedNumber = useDebounce(filterNumber, 600);
 
   const NONE     = '__none__';
   const toFilter = (v: string) => (v === NONE ? '' : v);
 
-  const activeFilterCount = [filterSetId, filterType, filterRarity].filter(Boolean).length;
+  const activeFilterCount = [filterSetId, filterType, filterRarity, filterNumber].filter(Boolean).length;
   const hasActiveFilter   = activeFilterCount > 0;
   const isFiltering       = debouncedSearch.trim().length > 0 || hasActiveFilter;
 
   // ── Queries ───────────────────────────────────────────────────────────
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['cards', { name: debouncedSearch, setId: filterSetId, type: filterType, rarity: filterRarity }],
+    queryKey: ['cards', {
+      name:   debouncedSearch,
+      setId:  filterSetId,
+      type:   filterType,
+      rarity: filterRarity,
+      number: debouncedNumber,
+    }],
     queryFn: () => searchCards({
       name:   debouncedSearch.trim() || undefined,
       setId:  filterSetId  || undefined,
       types:  filterType   || undefined,
       rarity: filterRarity || undefined,
+      number: debouncedNumber.trim() || undefined,
       pageSize: 24,
     }),
     enabled: isFiltering,
-    // 10 minutes: search results are stable; prevents hammering the API on every
-    // revisit and keeps the grid populated from the localStorage persisted cache.
     staleTime: 10 * 60 * 1000,
   });
 
@@ -82,7 +89,6 @@ export default function Search() {
     queryKey: ['trending-cards'],
     queryFn: getTrendingCards,
     enabled: !isFiltering,
-    // 60 minutes: trending cards don't change frequently.
     staleTime: 60 * 60 * 1000,
   });
 
@@ -113,6 +119,7 @@ export default function Search() {
     setFilterSetId('');
     setFilterType('');
     setFilterRarity('');
+    setFilterNumber('');
   };
 
   return (
@@ -158,6 +165,7 @@ export default function Search() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-wrap gap-2 items-end"
           >
+            {/* Set */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Set</p>
               <Select value={filterSetId || NONE} onValueChange={(v) => setFilterSetId(toFilter(v))}>
@@ -176,6 +184,7 @@ export default function Search() {
               </Select>
             </div>
 
+            {/* Type */}
             <div className="flex-1 min-w-[130px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Type</p>
               <Select value={filterType || NONE} onValueChange={(v) => setFilterType(toFilter(v))}>
@@ -187,6 +196,7 @@ export default function Search() {
               </Select>
             </div>
 
+            {/* Rarity */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Rarity</p>
               <Select value={filterRarity || NONE} onValueChange={(v) => setFilterRarity(toFilter(v))}>
@@ -198,8 +208,24 @@ export default function Search() {
               </Select>
             </div>
 
+            {/* Card number */}
+            <div className="flex-1 min-w-[110px]">
+              <p className="text-xs text-muted-foreground mb-1 font-medium">Card #</p>
+              <Input
+                className="h-9 text-sm font-mono"
+                placeholder="e.g. 001, SV01"
+                value={filterNumber}
+                onChange={(e) => setFilterNumber(e.target.value)}
+              />
+            </div>
+
             {hasActiveFilter && (
-              <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground hover:text-foreground self-end" onClick={clearFilters}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-1.5 text-muted-foreground hover:text-foreground self-end"
+                onClick={clearFilters}
+              >
                 <X className="h-3.5 w-3.5" />
                 Clear
               </Button>
@@ -228,6 +254,12 @@ export default function Search() {
                 <button onClick={() => setFilterRarity('')} className="hover:text-destructive ml-0.5"><X className="h-3 w-3" /></button>
               </Badge>
             )}
+            {filterNumber && (
+              <Badge variant="secondary" className="gap-1 text-xs font-mono">
+                #{filterNumber}
+                <button onClick={() => setFilterNumber('')} className="hover:text-destructive ml-0.5"><X className="h-3 w-3" /></button>
+              </Badge>
+            )}
           </div>
         )}
       </div>
@@ -252,8 +284,6 @@ export default function Search() {
               No cards found — try adjusting your search or filters.
             </div>
           ) : (
-            // No stagger — all cards render instantly when data arrives.
-            // Individual card images fade in as they load via CardItem's internal state.
             <div className={GRID}>
               {data?.data.map((card) => (
                 <CardItem key={card.id} card={card} />

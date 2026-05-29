@@ -8,7 +8,27 @@ import { motion } from 'framer-motion';
 import { Link } from 'wouter';
 import { getAvailableVariants, getVariantLetter } from '@/utils/variants';
 
+// ─── Energy type colours ──────────────────────────────────────────────────
+
+const TYPE_COLORS: Record<string, string> = {
+  Fire:       '#FF6B35',
+  Water:      '#5DADE2',
+  Grass:      '#58D68D',
+  Lightning:  '#F4D03F',
+  Psychic:    '#C39BD3',
+  Fighting:   '#CA6F1E',
+  Darkness:   '#5D6D7E',
+  Metal:      '#A2A9B1',
+  Dragon:     '#8E44AD',
+  Fairy:      '#F48FB1',
+  Colorless:  '#BDC3C7',
+};
+
+// ─── Constants ────────────────────────────────────────────────────────────
+
 const STANDARD_KEYS = new Set(['normal', 'unlimitedNormal']);
+
+// ─── Component ────────────────────────────────────────────────────────────
 
 interface CardItemProps {
   card: PokemonCard;
@@ -21,7 +41,7 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Images already in the browser cache complete synchronously before first paint
+  // Already-cached images complete synchronously before the first paint
   useEffect(() => {
     if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
       setImgLoaded(true);
@@ -35,8 +55,6 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const totalQty   = genericQty + variantQty;
 
   const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
-
-  // Only show letter badges for non-standard variant tracking
   const trackedVariantLetters = [
     ...new Set(
       Object.entries(variantMap)
@@ -75,12 +93,10 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         className="group relative cursor-pointer"
       >
+        {/* ── Card image ────────────────────────────────────────────── */}
         <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-2 relative aspect-[63/88]">
-            {/*
-              Card-back gradient placeholder — renders at zero cost, zero latency.
-              Stays visible until the image fully loads, then fades away.
-            */}
+            {/* Instant card-back gradient placeholder */}
             <div
               className={`absolute inset-2 rounded-sm transition-opacity duration-200 ${imgLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
               style={{
@@ -95,46 +111,61 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
               className={`w-full h-full object-contain drop-shadow-md transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImgLoaded(true)}
             />
+
+            {/* +/- quick-action buttons — inside image area, shown on hover */}
+            <button
+              onClick={handleQuickAdd}
+              className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Quick add"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            {genericQty > 0 && (
+              <button
+                onClick={handleQuickRemove}
+                className="absolute bottom-2 left-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Quick remove"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+            )}
           </CardContent>
         </Card>
 
-        {/* Blue quantity badge — top right */}
+        {/* Blue quantity badge — top right, outside card */}
         {totalQty > 0 && (
-          <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shadow-md z-10 font-mono select-none">
+          <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center shadow-md z-10 font-mono select-none">
             {totalQty}
           </div>
         )}
 
-        {/* Gold variant letter badges — non-standard variants only */}
+        {/* Gold variant letter badges — non-standard variants */}
         {trackedVariantLetters.map((letter, i) => (
           <div
             key={letter + i}
-            className="absolute -top-2 w-6 h-6 rounded-full bg-yellow-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md z-10 select-none"
-            style={{ left: `${-8 + i * 18}px` }}
+            className="absolute -top-2 w-5 h-5 rounded-full bg-yellow-500 text-white text-[9px] font-bold flex items-center justify-center shadow-md z-10 select-none"
+            style={{ left: `${-6 + i * 16}px` }}
           >
             {letter}
           </div>
         ))}
 
-        {/* Green + quick-add */}
-        <button
-          onClick={handleQuickAdd}
-          className="absolute -bottom-2 -right-2 w-7 h-7 rounded-full bg-green-500 text-white flex items-center justify-center shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-          aria-label="Quick add"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-
-        {/* Red − quick-remove */}
-        {genericQty > 0 && (
-          <button
-            onClick={handleQuickRemove}
-            className="absolute -bottom-2 -left-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Quick remove"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-        )}
+        {/* ── Info strip: type dots + card number ───────────────────── */}
+        <div className="mt-1 flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-1">
+            {card.types?.map((type) => (
+              <span
+                key={type}
+                className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ background: TYPE_COLORS[type] ?? '#BDC3C7' }}
+                title={type}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-muted-foreground font-mono leading-none">
+            #{card.number}
+          </span>
+        </div>
       </motion.div>
     </Link>
   );

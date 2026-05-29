@@ -7,16 +7,16 @@ import { useCollectionStore } from '@/store/collectionStore';
 import { PokemonSet } from '@/types/pokemon';
 
 const ERAS: { label: string; series: string[] }[] = [
-  { label: 'Scarlet & Violet', series: ['Scarlet & Violet'] },
-  { label: 'Sword & Shield', series: ['Sword & Shield'] },
-  { label: 'Sun & Moon', series: ['Sun & Moon'] },
-  { label: 'XY', series: ['XY'] },
-  { label: 'Black & White', series: ['Black & White'] },
+  { label: 'Scarlet & Violet',       series: ['Scarlet & Violet'] },
+  { label: 'Sword & Shield',         series: ['Sword & Shield'] },
+  { label: 'Sun & Moon',             series: ['Sun & Moon'] },
+  { label: 'XY',                     series: ['XY'] },
+  { label: 'Black & White',          series: ['Black & White'] },
   { label: 'HeartGold & SoulSilver', series: ['HeartGold & SoulSilver'] },
-  { label: 'Diamond & Pearl', series: ['Diamond & Pearl', 'Platinum'] },
-  { label: 'EX Series', series: ['EX'] },
-  { label: 'Wizards of the Coast', series: ['Base', 'Jungle', 'Fossil', 'Team Rocket', 'Gym', 'Neo', 'Legendary Collection', 'e-Card'] },
-  { label: 'Other', series: [] },
+  { label: 'Diamond & Pearl',        series: ['Diamond & Pearl', 'Platinum'] },
+  { label: 'EX Series',              series: ['EX'] },
+  { label: 'Wizards of the Coast',   series: ['Base', 'Jungle', 'Fossil', 'Team Rocket', 'Gym', 'Neo', 'Legendary Collection', 'e-Card'] },
+  { label: 'Other',                  series: [] },
 ];
 
 function getCompletion(set: PokemonSet, collectionCards: Record<string, { cardId: string }>) {
@@ -32,7 +32,7 @@ export default function Sets() {
   const { data: sets, isLoading, isError } = useQuery({
     queryKey: ['sets'],
     queryFn: getSets,
-    staleTime: 3600000,
+    staleTime: 24 * 60 * 60 * 1000,
   });
   const { collectionCards } = useCollectionStore();
 
@@ -85,10 +85,10 @@ export default function Sets() {
                     transition={{ duration: 0.2, delay: i * 0.03 }}
                     className="group cursor-pointer rounded-xl border border-border bg-card hover:border-primary/40 hover:shadow-md transition-all duration-200 overflow-hidden"
                     onClick={() => setLocation(`/sets/${set.id}`)}
-                    data-testid={`set-card-${set.id}`}
                   >
                     <div className="flex items-center gap-3 p-4">
-                      <div className="w-20 h-12 shrink-0 flex items-center justify-center">
+                      {/* Set logo — decorative wide image */}
+                      <div className="w-16 h-10 shrink-0 flex items-center justify-center">
                         {set.images.logo ? (
                           <img
                             src={set.images.logo}
@@ -106,9 +106,15 @@ export default function Sets() {
                           />
                         )}
                       </div>
+
+                      {/* Set info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">{set.name}</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">{set.releaseDate} · {total} cards</p>
+                        <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">
+                          {set.name}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {set.releaseDate} · {total} cards
+                        </p>
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">{owned} / {total} owned</span>
@@ -123,6 +129,25 @@ export default function Sets() {
                             />
                           </div>
                         </div>
+                      </div>
+
+                      {/*
+                        Set symbol — the small icon printed in the bottom-right corner
+                        of every physical card in this set. Match this to identify
+                        which set a card belongs to.
+                      */}
+                      <div
+                        className="shrink-0 flex flex-col items-center gap-0.5 pl-1"
+                        title="Set symbol — match this on your physical card"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center">
+                          <img
+                            src={set.images.symbol}
+                            alt={`${set.name} symbol`}
+                            className="w-6 h-6 object-contain"
+                          />
+                        </div>
+                        <span className="text-[9px] text-muted-foreground leading-none">symbol</span>
                       </div>
                     </div>
                   </motion.div>
