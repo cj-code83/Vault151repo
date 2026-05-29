@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchCards, getTrendingCards, getSets } from '@/services/pokemonTcg';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -43,21 +43,20 @@ const SERIES_ORDER = [
 ];
 
 const GRID = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
+const NONE = '__none__';
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function Search() {
-  const [searchTerm, setSearchTerm]       = useState('');
-  const [filterSetId, setFilterSetId]     = useState('');
-  const [filterType, setFilterType]       = useState('');
-  const [filterRarity, setFilterRarity]   = useState('');
-  const [filterNumber, setFilterNumber]   = useState('');
-  const [showFilters, setShowFilters]     = useState(false);
+  const [searchTerm, setSearchTerm]     = useState('');
+  const [filterSetId, setFilterSetId]   = useState('');
+  const [filterType, setFilterType]     = useState('');
+  const [filterRarity, setFilterRarity] = useState('');
+  const [filterNumber, setFilterNumber] = useState('');
+  const [showFilters, setShowFilters]   = useState(false);
 
   const debouncedSearch = useDebounce(searchTerm, 400);
-  const debouncedNumber = useDebounce(filterNumber, 600);
 
-  const NONE     = '__none__';
   const toFilter = (v: string) => (v === NONE ? '' : v);
 
   const activeFilterCount = [filterSetId, filterType, filterRarity, filterNumber].filter(Boolean).length;
@@ -71,14 +70,14 @@ export default function Search() {
       setId:  filterSetId,
       type:   filterType,
       rarity: filterRarity,
-      number: debouncedNumber,
+      number: filterNumber,
     }],
     queryFn: () => searchCards({
       name:   debouncedSearch.trim() || undefined,
       setId:  filterSetId  || undefined,
       types:  filterType   || undefined,
       rarity: filterRarity || undefined,
-      number: debouncedNumber.trim() || undefined,
+      number: filterNumber || undefined,
       pageSize: 24,
     }),
     enabled: isFiltering,
@@ -98,9 +97,10 @@ export default function Search() {
     staleTime: 24 * 60 * 60 * 1000,
   });
 
-  // ── Group sets by series for the filter dropdown ──────────────────────
-  const groupedSets: { series: string; items: { id: string; name: string }[] }[] = [];
-  if (sets) {
+  // ── Group sets by series for the Set filter dropdown ──────────────────
+  const groupedSets = useMemo(() => {
+    const result: { series: string; items: { id: string; name: string }[] }[] = [];
+    if (!sets) return result;
     const seen = new Set<string>();
     for (const series of SERIES_ORDER) {
       const matches = sets.filter(
@@ -108,12 +108,21 @@ export default function Search() {
       );
       if (matches.length) {
         matches.forEach((s) => seen.add(s.id));
-        groupedSets.push({ series, items: matches.map((s) => ({ id: s.id, name: s.name })) });
+        result.push({ series, items: matches.map((s) => ({ id: s.id, name: s.name })) });
       }
     }
     const other = sets.filter((s) => !seen.has(s.id));
-    if (other.length) groupedSets.push({ series: 'Other', items: other.map((s) => ({ id: s.id, name: s.name })) });
-  }
+    if (other.length) result.push({ series: 'Other', items: other.map((s) => ({ id: s.id, name: s.name })) });
+    return result;
+  }, [sets]);
+
+  // ── Number filter options — based on selected set's total ─────────────
+  // When a set is chosen, generate 1..printedTotal; otherwise 1..300.
+  const numberOptions = useMemo(() => {
+    const selectedSet = sets?.find((s) => s.id === filterSetId);
+    const max = selectedSet ? (selectedSet.printedTotal || selectedSet.total || 300) : 300;
+    return Array.from({ length: max }, (_, i) => String(i + 1));
+  }, [sets, filterSetId]);
 
   const clearFilters = () => {
     setFilterSetId('');
@@ -168,7 +177,10 @@ export default function Search() {
             {/* Set */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Set</p>
-              <Select value={filterSetId || NONE} onValueChange={(v) => setFilterSetId(toFilter(v))}>
+              <Select value={filterSetId || NONE} onValueChange={(v) => {
+                setFilterSetId(toFilter(v));
+                setFilterNumber(''); // reset number when set changes
+              }}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Any set" /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   <SelectItem value={NONE}>Any set</SelectItem>
@@ -211,12 +223,19 @@ export default function Search() {
             {/* Card number */}
             <div className="flex-1 min-w-[110px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Card #</p>
-              <Input
-                className="h-9 text-sm font-mono"
-                placeholder="e.g. 001, SV01"
-                value={filterNumber}
-                onChange={(e) => setFilterNumber(e.target.value)}
-              />
+              <Select value={filterNumber || NONE} onValueChange={(v) => setFilterNumber(toFilter(v))}>
+                <SelectTrigger className="h-9 text-sm font-mono">
+                  <SelectValue placeholder="Any #" />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  <SelectItem value={NONE}>Any #</SelectItem>
+                  {numberOptions.map((n) => (
+                    <SelectItem key={n} value={n} className="font-mono text-sm">
+                      #{n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {hasActiveFilter && (

@@ -4,18 +4,39 @@ import { searchCards, getSets } from '@/services/pokemonTcg';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { CardItem } from '@/components/card-item';
 import { useCollectionStore } from '@/store/collectionStore';
 import { PokemonCard } from '@/types/pokemon';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 const PAGE_SIZE = 250;
+const NONE = '__none__';
+
+/** Sort card numbers: pure integers first (numeric), then alphanumeric strings. */
+function sortCardNumbers(nums: string[]): string[] {
+  return [...nums].sort((a, b) => {
+    const na = parseInt(a, 10);
+    const nb = parseInt(b, 10);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    if (!isNaN(na)) return -1;
+    if (!isNaN(nb)) return 1;
+    return a.localeCompare(b);
+  });
+}
 
 export default function SetDetail() {
   const { id: setId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { collectionCards } = useCollectionStore();
   const [allCards, setAllCards] = useState<PokemonCard[]>([]);
+  const [numberFilter, setNumberFilter] = useState('');
 
   const { data: setsData } = useQuery({
     queryKey: ['sets'],
@@ -46,7 +67,18 @@ export default function SetDetail() {
     if (page1?.data) cards.push(...page1.data);
     if (page2?.data) cards.push(...page2.data);
     setAllCards(cards);
+    setNumberFilter(''); // reset filter when set changes
   }, [page1, page2]);
+
+  // Available numbers extracted from actual card data — exact, includes promos
+  const availableNumbers = useMemo(
+    () => sortCardNumbers([...new Set(allCards.map((c) => c.number))]),
+    [allCards]
+  );
+
+  const displayedCards = numberFilter
+    ? allCards.filter((c) => c.number === numberFilter)
+    : allCards;
 
   const setCardIds = new Set(allCards.map((c) => c.id));
   const owned = Object.values(collectionCards).filter(
@@ -58,11 +90,13 @@ export default function SetDetail() {
   return (
     <div className="flex flex-col">
       {/*
-        ── Sticky header: back button + set logo + name ──────────────────
-        Stays visible while scrolling through the card grid so the user
-        always knows which set they're browsing.
+        ── Sticky header ─────────────────────────────────────────────────
+        Contains: back button, set logo, name, completion %, progress bar,
+        and the number filter — all frozen at the top while scrolling.
       */}
-      <div className="sticky top-16 md:top-0 z-20 bg-background -mx-4 md:-mx-8 px-4 md:px-8 pt-3 pb-3 border-b border-border">
+      <div className="sticky top-16 md:top-0 z-20 bg-background -mx-4 md:-mx-8 px-4 md:px-8 pt-3 pb-3 border-b border-border space-y-2">
+
+        {/* Row 1: back + logo + name + completion */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -87,17 +121,12 @@ export default function SetDetail() {
           ) : null}
 
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-bold leading-tight truncate">
-              {set?.name ?? setId}
-            </h1>
+            <h1 className="text-lg font-bold leading-tight truncate">{set?.name ?? setId}</h1>
             {set && (
-              <p className="text-xs text-muted-foreground">
-                {set.series} · {set.releaseDate}
-              </p>
+              <p className="text-xs text-muted-foreground">{set.series} · {set.releaseDate}</p>
             )}
           </div>
 
-          {/* Completion badge — always visible in sticky bar */}
           {total > 0 && (
             <div className="shrink-0 text-right">
               <p className={`text-sm font-bold ${pct === 100 ? 'text-green-500' : pct > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -107,19 +136,52 @@ export default function SetDetail() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* ── Progress bar (scrolls away) ── */}
-      {set && (
-        <div className="pt-4 px-0">
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
+        {/* Row 2: progress bar */}
+        {set && (
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
               style={{ width: `${pct}%` }}
             />
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Row 3: card number filter */}
+        {availableNumbers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Select
+              value={numberFilter || NONE}
+              onValueChange={(v) => setNumberFilter(v === NONE ? '' : v)}
+            >
+              <SelectTrigger className="h-8 text-sm w-44">
+                <SelectValue placeholder="All card numbers" />
+              </SelectTrigger>
+              <SelectContent className="max-h-64">
+                <SelectItem value={NONE}>All card numbers</SelectItem>
+                {availableNumbers.map((n) => (
+                  <SelectItem key={n} value={n} className="font-mono text-sm">
+                    #{n}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {numberFilter && (
+              <button
+                onClick={() => setNumberFilter('')}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Clear
+              </button>
+            )}
+            {numberFilter && (
+              <span className="text-xs text-muted-foreground">
+                {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Card grid ── */}
       <div className="pt-4 pb-6">
@@ -137,17 +199,25 @@ export default function SetDetail() {
 
         {!isLoading && allCards.length > 0 && (
           <>
-            <div className="text-xs text-muted-foreground mb-3">
-              {page1?.totalCount ?? allCards.length} cards in set
-              {needsPage2 && !page2 && (
-                <span className="ml-2 text-primary animate-pulse">Loading more…</span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {allCards.map((card) => (
-                <CardItem key={card.id} card={card} />
-              ))}
-            </div>
+            {!numberFilter && (
+              <div className="text-xs text-muted-foreground mb-3">
+                {page1?.totalCount ?? allCards.length} cards in set
+                {needsPage2 && !page2 && (
+                  <span className="ml-2 text-primary animate-pulse">Loading more…</span>
+                )}
+              </div>
+            )}
+            {displayedCards.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No cards with number #{numberFilter} in this set.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                {displayedCards.map((card) => (
+                  <CardItem key={card.id} card={card} />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

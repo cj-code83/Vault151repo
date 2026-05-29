@@ -6,10 +6,19 @@ import { getCardsByIds, getSets } from '@/services/pokemonTcg';
 import { CardItem } from '@/components/card-item';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ChevronLeft } from 'lucide-react';
 import { useSearch } from 'wouter';
 import { motion } from 'framer-motion';
 import { PokemonSet } from '@/types/pokemon';
+
+const NONE = '__none__';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -17,9 +26,23 @@ function variantTotal(variants?: Record<string, number>) {
   return Object.values(variants ?? {}).reduce((s, v) => s + v, 0);
 }
 
+/** Sort card numbers: integers first (numeric order), then alphanumeric. */
+function sortCardNumbers(nums: string[]): string[] {
+  return [...nums].sort((a, b) => {
+    const na = parseInt(a, 10);
+    const nb = parseInt(b, 10);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    if (!isNaN(na)) return -1;
+    if (!isNaN(nb)) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 // ─── Generic card grid (wishlist / favourites tabs) ───────────────────────
 
 function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
+  const [numberFilter, setNumberFilter] = useState('');
+
   const sortedKey = [...ids].sort().join(',');
   const { data: cards, isLoading } = useQuery({
     queryKey: ['collection-cards', activeTab, sortedKey],
@@ -28,19 +51,73 @@ function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Reset filter when the card list changes (e.g. tab switch via key or ids change)
+  useEffect(() => {
+    setNumberFilter('');
+  }, [sortedKey]);
+
+  // Extract available numbers from loaded cards — exact values including promos
+  const availableNumbers = useMemo(() => {
+    if (!cards?.length) return [];
+    return sortCardNumbers([...new Set(cards.map((c) => c.number))]);
+  }, [cards]);
+
+  const displayedCards = numberFilter
+    ? (cards ?? []).filter((c) => c.number === numberFilter)
+    : (cards ?? []);
+
   if (ids.length === 0) return null;
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {ids.map((id) => <Skeleton key={id} className="aspect-[63/88] rounded-lg" />)}
-      </div>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-      {(cards ?? []).map((card) => <CardItem key={card.id} card={card} />)}
+    <div className="space-y-3">
+      {/* Number filter — shown once cards are loaded */}
+      {availableNumbers.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Select
+            value={numberFilter || NONE}
+            onValueChange={(v) => setNumberFilter(v === NONE ? '' : v)}
+          >
+            <SelectTrigger className="h-8 text-sm w-44">
+              <SelectValue placeholder="All card numbers" />
+            </SelectTrigger>
+            <SelectContent className="max-h-64">
+              <SelectItem value={NONE}>All card numbers</SelectItem>
+              {availableNumbers.map((n) => (
+                <SelectItem key={n} value={n} className="font-mono text-sm">
+                  #{n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {numberFilter && (
+            <button
+              onClick={() => setNumberFilter('')}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Clear
+            </button>
+          )}
+          {numberFilter && (
+            <span className="text-xs text-muted-foreground">
+              {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {ids.map((id) => <Skeleton key={id} className="aspect-[63/88] rounded-lg" />)}
+        </div>
+      ) : displayedCards.length === 0 && numberFilter ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No cards with number #{numberFilter}.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {displayedCards.map((card) => <CardItem key={card.id} card={card} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -119,7 +196,6 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
     staleTime: 3_600_000,
   });
 
-  // Group owned card IDs by set (match via set ID prefix in card ID)
   const ownedSetData = useMemo(() => {
     if (!sets || ownedIds.length === 0) return [];
     return sets
@@ -131,7 +207,6 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
         return { set, ownedIds: setOwnedIds, owned: setOwnedIds.length, total, pct };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
-      // Newest sets first
       .sort((a, b) => b.set.releaseDate.localeCompare(a.set.releaseDate));
   }, [sets, ownedIds]);
 
@@ -259,7 +334,7 @@ export default function Collection() {
           )}
         </TabsContent>
 
-        {/* Wishlist & Favourites — flat grid as before */}
+        {/* Wishlist & Favourites — flat grid with number filter */}
         {(['wishlist', 'favourites'] as const).map((tab) => {
           const ids = tab === 'wishlist' ? wishlistIds : favouriteIds;
           return (
@@ -269,7 +344,7 @@ export default function Collection() {
                   {emptyMessage[tab]}
                 </div>
               ) : (
-                <CardGrid ids={ids} activeTab={tab} />
+                <CardGrid key={tab} ids={ids} activeTab={tab} />
               )}
             </TabsContent>
           );
