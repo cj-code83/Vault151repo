@@ -1,9 +1,27 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useCollectionStore } from '@/store/collectionStore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, Copy, ExternalLink } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Check, Copy, Download, ExternalLink, Loader2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  exportCollection,
+  importCollection,
+  parseBackupFile,
+  CollectionBackup,
+  ImportMode,
+} from '@/utils/backup';
+
+// ─── SQL snippets shown to users who need to set up their DB ─────────────
 
 const SQL_SCHEMA = `-- Step 1: Create the collection_cards table
 create table if not exists collection_cards (
@@ -39,7 +57,6 @@ create policy "Users manage own profile" on profiles
 -- Step 3: Add variants column if upgrading from an earlier version
 alter table collection_cards add column if not exists variants jsonb default '{}'::jsonb;`;
 
-// Separate SQL block so users can run it independently once the core schema exists.
 const SQL_CACHE_TABLE = `-- Optional: shared card metadata cache
 -- Stores card data fetched from the Pokémon TCG API so repeat lookups
 -- are served from Supabase (~80 ms) instead of the external API (~400 ms).
@@ -55,6 +72,8 @@ create policy "card_cache_auth_write"   on card_cache for insert
   with check (auth.role() = 'authenticated');
 create policy "card_cache_auth_update"  on card_cache for update
   using (auth.role() = 'authenticated');`;
+
+// ─── CopyBlock ─────────────────────────────────────────────────────────────
 
 function CopyBlock({ id, sql }: { id: string; sql: string }) {
   const [copied, setCopied] = useState(false);
@@ -96,12 +115,142 @@ function CopyBlock({ id, sql }: { id: string; sql: string }) {
   );
 }
 
+// ─── Import confirmation dialog ────────────────────────────────────────────
+
+interface ImportDialogProps {
+  backup:    CollectionBackup | null;
+  onChoose:  (mode: ImportMode) => void;
+  onCancel:  () => void;
+  loading:   boolean;
+}
+
+function ImportDialog({ backup, onChoose, onCancel, loading }: ImportDialogProps) {
+  return (
+    <Dialog open={!!backup} onOpenChange={(open) => { if (!open && !loading) onCancel(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Import Collection</DialogTitle>
+          <DialogDescription>
+            How would you like to import this collection?
+            {backup && (
+              <span className="block mt-1 font-medium text-foreground">
+                {backup.cards.length} cards · exported {new Date(backup.exportDate).toLocaleDateString()}
+              </span>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {/* Merge option */}
+          <button
+            disabled={loading}
+            onClick={() => onChoose('merge')}
+            className="w-full text-left rounded-lg border border-border hover:border-primary/60 hover:bg-primary/5 p-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <p className="font-semibold text-sm">Merge With Existing Collection</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Add or overwrite cards from the backup. Cards not in the file are kept as-is.
+            </p>
+          </button>
+
+          {/* Replace option */}
+          <button
+            disabled={loading}
+            onClick={() => onChoose('replace')}
+            className="w-full text-left rounded-lg border border-destructive/40 hover:border-destructive hover:bg-destructive/5 p-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <p className="font-semibold text-sm text-destructive">Replace Existing Collection</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Delete your current collection and replace it entirely with the backup.
+              This cannot be undone — export first if you want to keep a copy.
+            </p>
+          </button>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onCancel} disabled={loading}>
+            Cancel
+          </Button>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Importing…
+            </div>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────
+
 export default function Profile() {
   const { user, signOut } = useAuth();
   const { dbSetupRequired, fetchCollection } = useCollectionStore();
 
+  // ── Backup state ───────────────────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [exporting, setExporting]         = useState(false);
+  const [importing, setImporting]         = useState(false);
+  const [pendingBackup, setPendingBackup] = useState<CollectionBackup | null>(null);
+
   const handleRetry = () => {
     if (user) fetchCollection(user.id);
+  };
+
+  // ── Export ─────────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    if (!user) return;
+    setExporting(true);
+    try {
+      await exportCollection(user.id);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ── Import: open file picker ───────────────────────────────────────────
+  const handleImportClick = () => {
+    if (!user) return;
+    fileInputRef.current?.click();
+  };
+
+  // ── Import: file selected — parse & validate, then show dialog ────────
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset input so the same file can be re-selected after cancellation
+    e.target.value = '';
+    if (!file || !user) return;
+
+    try {
+      const backup = await parseBackupFile(file);
+      setPendingBackup(backup);
+    } catch (err) {
+      toast.error('Invalid backup file', {
+        description: err instanceof Error ? err.message : 'Could not parse file.',
+      });
+    }
+  };
+
+  // ── Import: user chose merge or replace ───────────────────────────────
+  const handleImportChoose = async (mode: ImportMode) => {
+    if (!user || !pendingBackup) return;
+    setImporting(true);
+    try {
+      const ok = await importCollection(user.id, pendingBackup, mode);
+      if (ok) {
+        setPendingBackup(null);
+        // Refresh the in-memory collection store so the UI reflects the import immediately
+        await fetchCollection(user.id);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportCancel = () => {
+    if (!importing) setPendingBackup(null);
   };
 
   return (
@@ -112,7 +261,7 @@ export default function Profile() {
       </div>
 
       <div className="pt-6 space-y-6 max-w-2xl">
-        {/* Account */}
+        {/* ── Account ── */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle>Account</CardTitle>
@@ -128,7 +277,55 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Core schema (shown when DB isn't set up yet) */}
+        {/* ── Collection Backup ── */}
+        <Card className="border-border">
+          <CardHeader>
+            <CardTitle>Collection Backup</CardTitle>
+            <CardDescription>
+              Protect your collection by exporting a backup file that can be restored on any device.
+              Backups contain only your card list — never images, pricing, or cache data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Export */}
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={handleExport}
+              disabled={exporting || !user}
+            >
+              {exporting
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Download className="w-4 h-4" />}
+              Export Collection
+            </Button>
+
+            {/* Import — hidden file input + visible button */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={handleImportClick}
+              disabled={importing || !user}
+            >
+              <Upload className="w-4 h-4" />
+              Import Collection
+            </Button>
+
+            <p className="text-xs text-muted-foreground pt-1">
+              Import accepts files exported from this app. Choose between merging with your
+              existing collection or replacing it entirely.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* ── Database setup required ── */}
         {dbSetupRequired && (
           <Card className="border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40">
             <CardHeader>
@@ -156,7 +353,7 @@ export default function Profile() {
           </Card>
         )}
 
-        {/* Shared card cache — always shown so users can opt in */}
+        {/* ── Shared card cache ── */}
         <Card className="border-border">
           <CardHeader>
             <CardTitle className="text-base">Shared Card Cache</CardTitle>
@@ -183,6 +380,14 @@ export default function Profile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Import mode selection dialog ── */}
+      <ImportDialog
+        backup={pendingBackup}
+        onChoose={handleImportChoose}
+        onCancel={handleImportCancel}
+        loading={importing}
+      />
     </div>
   );
 }
