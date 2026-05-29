@@ -17,6 +17,7 @@ import { ChevronLeft } from 'lucide-react';
 import { useSearch } from 'wouter';
 import { motion } from 'framer-motion';
 import { PokemonSet } from '@/types/pokemon';
+import { sortCards, SortOrder, SORT_OPTIONS } from '@/utils/sort';
 
 const NONE = '__none__';
 
@@ -26,7 +27,6 @@ function variantTotal(variants?: Record<string, number>) {
   return Object.values(variants ?? {}).reduce((s, v) => s + v, 0);
 }
 
-/** Sort card numbers: integers first (numeric order), then alphanumeric. */
 function sortCardNumbers(nums: string[]): string[] {
   return [...nums].sort((a, b) => {
     const na = parseInt(a, 10);
@@ -42,6 +42,7 @@ function sortCardNumbers(nums: string[]): string[] {
 
 function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
   const [numberFilter, setNumberFilter] = useState('');
+  const [sortOrder, setSortOrder]       = useState<SortOrder>('number');
 
   const sortedKey = [...ids].sort().join(',');
   const { data: cards, isLoading } = useQuery({
@@ -51,28 +52,31 @@ function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Reset filter when the card list changes (e.g. tab switch via key or ids change)
   useEffect(() => {
     setNumberFilter('');
+    setSortOrder('number');
   }, [sortedKey]);
 
-  // Extract available numbers from loaded cards — exact values including promos
   const availableNumbers = useMemo(() => {
     if (!cards?.length) return [];
     return sortCardNumbers([...new Set(cards.map((c) => c.number))]);
   }, [cards]);
 
-  const displayedCards = numberFilter
-    ? (cards ?? []).filter((c) => c.number === numberFilter)
-    : (cards ?? []);
+  const displayedCards = useMemo(() => {
+    const filtered = numberFilter
+      ? (cards ?? []).filter((c) => c.number === numberFilter)
+      : (cards ?? []);
+    return sortCards(filtered, sortOrder);
+  }, [cards, numberFilter, sortOrder]);
 
   if (ids.length === 0) return null;
 
   return (
     <div className="space-y-3">
-      {/* Number filter — shown once cards are loaded */}
-      {availableNumbers.length > 0 && (
-        <div className="flex items-center gap-2">
+      {/* Filter + sort controls — shown once cards are loaded */}
+      {(availableNumbers.length > 0 || !isLoading) && cards && cards.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Number filter */}
           <Select
             value={numberFilter || NONE}
             onValueChange={(v) => setNumberFilter(v === NONE ? '' : v)}
@@ -83,24 +87,38 @@ function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
             <SelectContent className="max-h-64">
               <SelectItem value={NONE}>All card numbers</SelectItem>
               {availableNumbers.map((n) => (
-                <SelectItem key={n} value={n} className="font-mono text-sm">
-                  #{n}
-                </SelectItem>
+                <SelectItem key={n} value={n} className="font-mono text-sm">#{n}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {/* Sort */}
+          <Select
+            value={sortOrder}
+            onValueChange={(v) => setSortOrder(v as SortOrder)}
+          >
+            <SelectTrigger className="h-8 text-sm w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {numberFilter && (
-            <button
-              onClick={() => setNumberFilter('')}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
-            >
-              Clear
-            </button>
-          )}
-          {numberFilter && (
-            <span className="text-xs text-muted-foreground">
-              {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
-            </span>
+            <>
+              <button
+                onClick={() => setNumberFilter('')}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Clear
+              </button>
+              <span className="text-xs text-muted-foreground">
+                {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
+              </span>
+            </>
           )}
         </div>
       )}
@@ -125,19 +143,9 @@ function CardGrid({ ids, activeTab }: { ids: string[]; activeTab: string }) {
 // ─── Set row card (owned tab) ─────────────────────────────────────────────
 
 function SetRow({
-  set,
-  owned,
-  total,
-  pct,
-  onClick,
-  index,
+  set, owned, total, pct, onClick, index,
 }: {
-  set: PokemonSet;
-  owned: number;
-  total: number;
-  pct: number;
-  onClick: () => void;
-  index: number;
+  set: PokemonSet; owned: number; total: number; pct: number; onClick: () => void; index: number;
 }) {
   return (
     <motion.div
@@ -210,7 +218,6 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
       .sort((a, b) => b.set.releaseDate.localeCompare(a.set.releaseDate));
   }, [sets, ownedIds]);
 
-  // ── Drill-down: cards within one set ──────────────────────────────────
   if (selectedSetId) {
     const selected = ownedSetData.find((s) => s.set.id === selectedSetId);
     return (
@@ -227,11 +234,7 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
           </Button>
           {selected && (
             <>
-              <img
-                src={selected.set.images.symbol}
-                alt={selected.set.name}
-                className="h-6 object-contain"
-              />
+              <img src={selected.set.images.symbol} alt={selected.set.name} className="h-6 object-contain" />
               <span className="font-semibold">{selected.set.name}</span>
               <span className="text-sm text-muted-foreground">
                 {selected.owned} / {selected.total} · {selected.pct}%
@@ -244,7 +247,6 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
     );
   }
 
-  // ── Set list view ──────────────────────────────────────────────────────
   if (setsLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -323,7 +325,6 @@ export default function Collection() {
       </div>
 
       <div className="pt-6">
-        {/* Owned — grouped by set */}
         <TabsContent value="owned" className="mt-0">
           {ownedIds.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-xl">
@@ -334,7 +335,6 @@ export default function Collection() {
           )}
         </TabsContent>
 
-        {/* Wishlist & Favourites — flat grid with number filter */}
         {(['wishlist', 'favourites'] as const).map((tab) => {
           const ids = tab === 'wishlist' ? wishlistIds : favouriteIds;
           return (

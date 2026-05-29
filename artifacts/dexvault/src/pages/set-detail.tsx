@@ -15,11 +15,12 @@ import { CardItem } from '@/components/card-item';
 import { useCollectionStore } from '@/store/collectionStore';
 import { PokemonCard } from '@/types/pokemon';
 import { useEffect, useState, useMemo } from 'react';
+import { sortCards, SortOrder, SORT_OPTIONS } from '@/utils/sort';
 
 const PAGE_SIZE = 250;
 const NONE = '__none__';
 
-/** Sort card numbers: pure integers first (numeric), then alphanumeric strings. */
+/** Sort card numbers: pure integers first (numeric), then alphanumeric. */
 function sortCardNumbers(nums: string[]): string[] {
   return [...nums].sort((a, b) => {
     const na = parseInt(a, 10);
@@ -37,6 +38,7 @@ export default function SetDetail() {
   const { collectionCards } = useCollectionStore();
   const [allCards, setAllCards] = useState<PokemonCard[]>([]);
   const [numberFilter, setNumberFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('number');
 
   const { data: setsData } = useQuery({
     queryKey: ['sets'],
@@ -67,18 +69,21 @@ export default function SetDetail() {
     if (page1?.data) cards.push(...page1.data);
     if (page2?.data) cards.push(...page2.data);
     setAllCards(cards);
-    setNumberFilter(''); // reset filter when set changes
+    setNumberFilter('');
+    setSortOrder('number');
   }, [page1, page2]);
 
-  // Available numbers extracted from actual card data — exact, includes promos
   const availableNumbers = useMemo(
     () => sortCardNumbers([...new Set(allCards.map((c) => c.number))]),
     [allCards]
   );
 
-  const displayedCards = numberFilter
-    ? allCards.filter((c) => c.number === numberFilter)
-    : allCards;
+  const displayedCards = useMemo(() => {
+    const filtered = numberFilter
+      ? allCards.filter((c) => c.number === numberFilter)
+      : allCards;
+    return sortCards(filtered, sortOrder);
+  }, [allCards, numberFilter, sortOrder]);
 
   const setCardIds = new Set(allCards.map((c) => c.id));
   const owned = Object.values(collectionCards).filter(
@@ -89,11 +94,7 @@ export default function SetDetail() {
 
   return (
     <div className="flex flex-col">
-      {/*
-        ── Sticky header ─────────────────────────────────────────────────
-        Contains: back button, set logo, name, completion %, progress bar,
-        and the number filter — all frozen at the top while scrolling.
-      */}
+      {/* ── Sticky header ── */}
       <div className="sticky top-16 md:top-0 z-20 bg-background -mx-4 md:-mx-8 px-4 md:px-8 pt-3 pb-3 border-b border-border space-y-2">
 
         {/* Row 1: back + logo + name + completion */}
@@ -147,9 +148,10 @@ export default function SetDetail() {
           </div>
         )}
 
-        {/* Row 3: card number filter */}
-        {availableNumbers.length > 0 && (
-          <div className="flex items-center gap-2">
+        {/* Row 3: number filter + sort */}
+        {allCards.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Number filter */}
             <Select
               value={numberFilter || NONE}
               onValueChange={(v) => setNumberFilter(v === NONE ? '' : v)}
@@ -160,24 +162,38 @@ export default function SetDetail() {
               <SelectContent className="max-h-64">
                 <SelectItem value={NONE}>All card numbers</SelectItem>
                 {availableNumbers.map((n) => (
-                  <SelectItem key={n} value={n} className="font-mono text-sm">
-                    #{n}
-                  </SelectItem>
+                  <SelectItem key={n} value={n} className="font-mono text-sm">#{n}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Sort */}
+            <Select
+              value={sortOrder}
+              onValueChange={(v) => setSortOrder(v as SortOrder)}
+            >
+              <SelectTrigger className="h-8 text-sm w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {numberFilter && (
-              <button
-                onClick={() => setNumberFilter('')}
-                className="text-xs text-muted-foreground hover:text-foreground underline"
-              >
-                Clear
-              </button>
-            )}
-            {numberFilter && (
-              <span className="text-xs text-muted-foreground">
-                {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
-              </span>
+              <>
+                <button
+                  onClick={() => setNumberFilter('')}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                >
+                  Clear
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
+                </span>
+              </>
             )}
           </div>
         )}

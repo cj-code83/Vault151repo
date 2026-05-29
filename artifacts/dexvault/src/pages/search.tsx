@@ -18,6 +18,7 @@ import { Search as SearchIcon, SlidersHorizontal, TrendingUp, X } from 'lucide-r
 import { CardItem } from '@/components/card-item';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
+import { sortCards, SortOrder, SORT_OPTIONS } from '@/utils/sort';
 
 // ─── Static filter options ─────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ export default function Search() {
   const [filterRarity, setFilterRarity] = useState('');
   const [filterNumber, setFilterNumber] = useState('');
   const [showFilters, setShowFilters]   = useState(false);
+  const [sortOrder, setSortOrder]       = useState<SortOrder>('number');
 
   const debouncedSearch = useDebounce(searchTerm, 400);
 
@@ -97,7 +99,7 @@ export default function Search() {
     staleTime: 24 * 60 * 60 * 1000,
   });
 
-  // ── Group sets by series for the Set filter dropdown ──────────────────
+  // ── Group sets by series ──────────────────────────────────────────────
   const groupedSets = useMemo(() => {
     const result: { series: string; items: { id: string; name: string }[] }[] = [];
     if (!sets) return result;
@@ -116,13 +118,22 @@ export default function Search() {
     return result;
   }, [sets]);
 
-  // ── Number filter options — based on selected set's total ─────────────
-  // When a set is chosen, generate 1..printedTotal; otherwise 1..300.
+  // ── Number options: 1..set.printedTotal (or 1..300 if no set chosen) ─
   const numberOptions = useMemo(() => {
     const selectedSet = sets?.find((s) => s.id === filterSetId);
     const max = selectedSet ? (selectedSet.printedTotal || selectedSet.total || 300) : 300;
     return Array.from({ length: max }, (_, i) => String(i + 1));
   }, [sets, filterSetId]);
+
+  // ── Apply client-side sort to API results ─────────────────────────────
+  const searchResults = useMemo(
+    () => sortCards(data?.data ?? [], sortOrder),
+    [data?.data, sortOrder]
+  );
+  const trendingResults = useMemo(
+    () => sortCards(trending ?? [], sortOrder),
+    [trending, sortOrder]
+  );
 
   const clearFilters = () => {
     setFilterSetId('');
@@ -134,14 +145,14 @@ export default function Search() {
   return (
     <div className="flex flex-col">
 
-      {/* ── Sticky header with search + filters ── */}
+      {/* ── Sticky header ── */}
       <div className="sticky top-16 md:top-0 z-20 bg-background -mx-4 md:-mx-8 px-4 md:px-8 pt-4 md:pt-8 pb-4 border-b border-border space-y-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-1">Search</h1>
           <p className="text-muted-foreground">Find and add cards to your collection.</p>
         </div>
 
-        {/* Search bar row */}
+        {/* Search bar + filter toggle */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -174,13 +185,15 @@ export default function Search() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-wrap gap-2 items-end"
           >
-            {/* Set */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Set</p>
-              <Select value={filterSetId || NONE} onValueChange={(v) => {
-                setFilterSetId(toFilter(v));
-                setFilterNumber(''); // reset number when set changes
-              }}>
+              <Select
+                value={filterSetId || NONE}
+                onValueChange={(v) => {
+                  setFilterSetId(toFilter(v));
+                  setFilterNumber('');
+                }}
+              >
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Any set" /></SelectTrigger>
                 <SelectContent className="max-h-72">
                   <SelectItem value={NONE}>Any set</SelectItem>
@@ -196,7 +209,6 @@ export default function Search() {
               </Select>
             </div>
 
-            {/* Type */}
             <div className="flex-1 min-w-[130px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Type</p>
               <Select value={filterType || NONE} onValueChange={(v) => setFilterType(toFilter(v))}>
@@ -208,7 +220,6 @@ export default function Search() {
               </Select>
             </div>
 
-            {/* Rarity */}
             <div className="flex-1 min-w-[160px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Rarity</p>
               <Select value={filterRarity || NONE} onValueChange={(v) => setFilterRarity(toFilter(v))}>
@@ -220,19 +231,19 @@ export default function Search() {
               </Select>
             </div>
 
-            {/* Card number */}
             <div className="flex-1 min-w-[110px]">
               <p className="text-xs text-muted-foreground mb-1 font-medium">Card #</p>
-              <Select value={filterNumber || NONE} onValueChange={(v) => setFilterNumber(toFilter(v))}>
+              <Select
+                value={filterNumber || NONE}
+                onValueChange={(v) => setFilterNumber(toFilter(v))}
+              >
                 <SelectTrigger className="h-9 text-sm font-mono">
                   <SelectValue placeholder="Any #" />
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
                   <SelectItem value={NONE}>Any #</SelectItem>
                   {numberOptions.map((n) => (
-                    <SelectItem key={n} value={n} className="font-mono text-sm">
-                      #{n}
-                    </SelectItem>
+                    <SelectItem key={n} value={n} className="font-mono text-sm">#{n}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -303,11 +314,32 @@ export default function Search() {
               No cards found — try adjusting your search or filters.
             </div>
           ) : (
-            <div className={GRID}>
-              {data?.data.map((card) => (
-                <CardItem key={card.id} card={card} />
-              ))}
-            </div>
+            <>
+              {/* Sort control above results */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-sm text-muted-foreground">
+                  {data?.data.length ?? 0} results
+                </span>
+                <Select
+                  value={sortOrder}
+                  onValueChange={(v) => setSortOrder(v as SortOrder)}
+                >
+                  <SelectTrigger className="h-8 text-sm w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className={GRID}>
+                {searchResults.map((card) => (
+                  <CardItem key={card.id} card={card} />
+                ))}
+              </div>
+            </>
           )
         )}
 
@@ -317,6 +349,21 @@ export default function Search() {
               <TrendingUp className="h-5 w-5 text-primary" />
               <h2 className="text-lg font-semibold">Trending</h2>
               <span className="text-xs text-muted-foreground">High-value recent releases</span>
+              {!trendingLoading && (
+                <Select
+                  value={sortOrder}
+                  onValueChange={(v) => setSortOrder(v as SortOrder)}
+                >
+                  <SelectTrigger className="h-8 text-sm w-32 ml-auto">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             {trendingLoading ? (
               <div className={GRID}>
@@ -326,7 +373,7 @@ export default function Search() {
               </div>
             ) : (
               <div className={GRID}>
-                {(trending ?? []).map((card) => (
+                {trendingResults.map((card) => (
                   <CardItem key={card.id} card={card} />
                 ))}
               </div>
