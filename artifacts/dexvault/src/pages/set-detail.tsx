@@ -249,8 +249,33 @@ export default function SetDetail() {
   const masterOwned    = ownedInSet.length;
   const masterTotal    = page1?.totalCount ?? allCards.length;
   const masterComplete = masterTotal > 0 && masterOwned >= masterTotal;
-  /** Only show master tracking when the set has cards beyond printedTotal. */
+  /** Only show extra tracking when the set has cards beyond printedTotal. */
   const hasMasterCards = masterTotal > standardTotal && standardTotal > 0;
+
+  /**
+   * Extra cards: numbered above printedTotal (secret rares, illustration rares, etc.)
+   * The bottom progress bar tracks how many of these the user owns.
+   */
+  const extraOwned = useMemo(() => {
+    if (printedTotal === 0) return 0;
+    return ownedInSet.filter((c) => {
+      const n = parseInt(c.number, 10);
+      return isNaN(n) || n > printedTotal;
+    }).length;
+  }, [ownedInSet, printedTotal]);
+
+  const extraTotal = useMemo(() => {
+    if (printedTotal === 0) return 0;
+    const fromCards = allCards.filter((c) => {
+      const n = parseInt(c.number, 10);
+      return isNaN(n) || n > printedTotal;
+    }).length;
+    // Use API-derived count when pages are still loading
+    return Math.max(fromCards, masterTotal - standardTotal);
+  }, [allCards, printedTotal, masterTotal, standardTotal]);
+
+  const extraPct     = extraTotal > 0 ? Math.min(100, Math.round((extraOwned / extraTotal) * 100)) : 0;
+  const extraComplete = extraTotal > 0 && extraOwned >= extraTotal;
 
   // ── Bulk action helpers ────────────────────────────────────────────────
 
@@ -328,29 +353,29 @@ export default function SetDetail() {
             )}
           </div>
 
-          {/* Completion stats — standard + master */}
+          {/* Completion stats — standard + extra */}
           {standardTotal > 0 && (
             <div className="shrink-0 text-right space-y-0.5">
               {/* Standard set */}
-              <div className={`flex items-center gap-1.5 justify-end text-sm font-bold leading-tight
+              <div className={`flex items-center gap-1.5 justify-end text-base font-bold leading-tight
                 ${standardComplete ? 'text-green-500' : standardOwned > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
                 <span>{standardOwned}/{standardTotal}</span>
                 {standardComplete
-                  ? <span className="text-xs font-medium">✓</span>
-                  : <span className="text-[11px] font-normal text-muted-foreground">{standardPct}%</span>}
+                  ? <span className="text-sm font-medium">✓</span>
+                  : <span className="text-xs font-normal text-muted-foreground">{standardPct}%</span>}
               </div>
-              {/* Master set — only visible when set contains secret rares */}
+              {/* Extra cards row — only visible when set contains secret rares */}
               {hasMasterCards && (
                 <div className="flex items-center gap-1 justify-end">
                   {masterComplete && (
                     <img src={masterBall} alt="Master Complete" className="w-4 h-4 object-contain" />
                   )}
-                  <p className={`text-[10px] leading-tight ${
+                  <p className={`text-xs leading-tight ${
                     masterComplete
                       ? 'text-yellow-600 dark:text-yellow-400 font-bold'
                       : 'text-muted-foreground'
                   }`}>
-                    {masterOwned}/{masterTotal} master
+                    {extraOwned}/{extraTotal} extra
                     {masterComplete && ' ★'}
                   </p>
                 </div>
@@ -359,24 +384,24 @@ export default function SetDetail() {
           )}
         </div>
 
-        {/* Row 2: progress bar */}
+        {/* Row 2: progress bars */}
         {set && standardTotal > 0 && (
-          <div className="space-y-0.5">
-            {/* Standard progress */}
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className="space-y-1">
+            {/* Standard progress — tracks cards #1 to printedTotal */}
+            <div className="h-3 rounded-full bg-muted overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${standardComplete ? 'bg-green-500' : 'bg-primary'}`}
                 style={{ width: `${standardPct}%` }}
               />
             </div>
-            {/* Master progress — thinner, below */}
+            {/* Extra progress — tracks secret rares / cards above printedTotal */}
             {hasMasterCards && (
-              <div className="h-0.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ${
-                    masterComplete ? 'bg-yellow-500' : 'bg-yellow-400/60'
+                    extraComplete ? 'bg-yellow-500' : 'bg-yellow-400/60'
                   }`}
-                  style={{ width: masterTotal > 0 ? `${Math.round((masterOwned / masterTotal) * 100)}%` : '0%' }}
+                  style={{ width: extraTotal > 0 ? `${extraPct}%` : '0%' }}
                 />
               </div>
             )}

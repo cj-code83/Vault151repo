@@ -4,7 +4,9 @@ import { getSets } from '@/services/pokemonTcg';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { useCollectionStore } from '@/store/collectionStore';
-import { PokemonSet } from '@/types/pokemon';
+import { CollectionCard, PokemonSet } from '@/types/pokemon';
+import pokeball   from '@/assets/pokeball.png';
+import masterBall from '@/assets/master-ball.png';
 
 const ERAS: { label: string; series: string[] }[] = [
   { label: 'Scarlet & Violet',       series: ['Scarlet & Violet'] },
@@ -19,12 +21,59 @@ const ERAS: { label: string; series: string[] }[] = [
   { label: 'Other',                  series: [] },
 ];
 
-function getCompletion(set: PokemonSet, collectionCards: Record<string, { cardId: string }>) {
-  const owned = Object.values(collectionCards).filter(
-    (c) => c.cardId.startsWith(set.id + '-')
-  ).length;
-  const total = set.printedTotal || set.total;
-  return { owned, total, pct: total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0 };
+/**
+ * Compute set completion stats using the correct logic:
+ *
+ * Standard set: count unique card NUMBERS ≤ printedTotal that the user owns.
+ * Any variant of the same number counts as collecting that number.
+ * Secret rares (number > printedTotal, or non-numeric) don't count.
+ *
+ * Master set: count unique card IDs owned, including secret rares.
+ */
+function getSetCompletion(
+  set: PokemonSet,
+  collectionCards: Record<string, CollectionCard>,
+) {
+  const printedTotal = set.printedTotal ?? 0;
+  const prefix = set.id + '-';
+
+  // Cards in this set that are effectively owned (qty > 0 OR any variant qty > 0)
+  const ownedInSet = Object.values(collectionCards).filter((cc) => {
+    if (!cc.cardId.startsWith(prefix)) return false;
+    return cc.quantity > 0 || Object.values(cc.variants ?? {}).some((v) => v > 0);
+  });
+
+  // Standard: unique card NUMBERS ≤ printedTotal
+  const ownedStdNums = new Set<string>();
+  for (const cc of ownedInSet) {
+    const suffix = cc.cardId.slice(prefix.length); // number portion after "setId-"
+    const n = parseInt(suffix, 10);
+    if (printedTotal > 0 && !isNaN(n) && n <= printedTotal) {
+      ownedStdNums.add(suffix);
+    }
+  }
+
+  const standardOwned   = ownedStdNums.size;
+  const standardTotal   = printedTotal;
+  const standardPct     = standardTotal > 0
+    ? Math.min(100, Math.round((standardOwned / standardTotal) * 100))
+    : 0;
+  const standardComplete = standardTotal > 0 && standardOwned >= standardTotal;
+
+  // Master: all unique card IDs in this set owned (standard + secret rares)
+  const masterOwned   = ownedInSet.length;
+  const masterTotal   = set.total ?? 0;
+  const masterComplete = masterTotal > 0 && masterOwned >= masterTotal;
+
+  return {
+    standardOwned,
+    standardTotal,
+    standardPct,
+    standardComplete,
+    masterOwned,
+    masterTotal,
+    masterComplete,
+  };
 }
 
 export default function Sets() {
@@ -76,7 +125,11 @@ export default function Sets() {
             <h2 className="text-lg font-semibold mb-3 text-foreground/80 border-b border-border pb-2">{era}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {eraSets.map((set, i) => {
-                const { owned, total, pct } = getCompletion(set, collectionCards);
+                const {
+                  standardOwned, standardTotal, standardPct,
+                  standardComplete, masterComplete,
+                } = getSetCompletion(set, collectionCards);
+
                 return (
                   <motion.div
                     key={set.id}
@@ -87,7 +140,7 @@ export default function Sets() {
                     onClick={() => setLocation(`/sets/${set.id}`)}
                   >
                     <div className="flex items-center gap-3 p-4">
-                      {/* Set logo — decorative wide image */}
+                      {/* Set logo */}
                       <div className="w-16 h-10 shrink-0 flex items-center justify-center">
                         {set.images.logo ? (
                           <img
@@ -107,47 +160,74 @@ export default function Sets() {
                         )}
                       </div>
 
-                      {/* Set info */}
+                      {/* Set info + progress */}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm leading-tight truncate group-hover:text-primary transition-colors">
                           {set.name}
                         </h3>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {set.releaseDate} · {total} cards
+                          {set.releaseDate} · {standardTotal || set.total} cards
                         </p>
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">{owned} / {total} owned</span>
-                            <span className={`font-semibold ${pct === 100 ? 'text-green-500' : pct > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
-                              {pct}%
+                            <span className="text-muted-foreground">
+                              {standardOwned} / {standardTotal || set.total} owned
+                            </span>
+                            <span className={`font-semibold ${
+                              standardComplete ? 'text-green-500' : standardPct > 0 ? 'text-primary' : 'text-muted-foreground'
+                            }`}>
+                              {standardPct}%
                             </span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
-                              style={{ width: `${pct}%` }}
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                standardComplete ? 'bg-green-500' : 'bg-primary'
+                              }`}
+                              style={{ width: `${standardPct}%` }}
                             />
                           </div>
                         </div>
                       </div>
 
-                      {/*
-                        Set symbol — the small icon printed in the bottom-right corner
-                        of every physical card in this set. Match this to identify
-                        which set a card belongs to.
-                      */}
+                      {/* Right column: completion ball OR set symbol */}
                       <div
                         className="shrink-0 flex flex-col items-center gap-0.5 pl-1"
-                        title="Set symbol — match this on your physical card"
+                        title={
+                          masterComplete
+                            ? 'Master Set Complete!'
+                            : standardComplete
+                            ? 'Standard Set Complete!'
+                            : 'Set symbol — match this on your physical card'
+                        }
                       >
-                        <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center">
+                        {masterComplete ? (
+                          /* Master set complete — gold master ball */
                           <img
-                            src={set.images.symbol}
-                            alt={`${set.name} symbol`}
-                            className="w-6 h-6 object-contain"
+                            src={masterBall}
+                            alt="Master Set Complete"
+                            className="w-9 h-9 object-contain"
                           />
-                        </div>
-                        <span className="text-[9px] text-muted-foreground leading-none">symbol</span>
+                        ) : standardComplete ? (
+                          /* Standard set complete — red pokéball */
+                          <img
+                            src={pokeball}
+                            alt="Standard Set Complete"
+                            className="w-9 h-9 object-contain"
+                          />
+                        ) : (
+                          /* Not yet complete — show set symbol */
+                          <>
+                            <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center">
+                              <img
+                                src={set.images.symbol}
+                                alt={`${set.name} symbol`}
+                                className="w-6 h-6 object-contain"
+                              />
+                            </div>
+                            <span className="text-[9px] text-muted-foreground leading-none">symbol</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </motion.div>
