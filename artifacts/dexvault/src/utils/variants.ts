@@ -3,6 +3,7 @@
 // Only keys present in that object for a given card are real printings.
 const PRICE_KEY_META: Record<string, { label: string; letter: string }> = {
   normal:              { label: 'Unlimited',        letter: 'U' },
+  unlimited:           { label: 'Unlimited',        letter: 'U' }, // older sets (e.g. Base Set 2) use this key
   holofoil:            { label: 'Holofoil',         letter: 'H' },
   reverseHolofoil:     { label: 'Reverse Holo',     letter: 'R' },
   '1stEditionHolofoil':{ label: '1st Edition Holo', letter: '1' },
@@ -41,6 +42,7 @@ export function getAvailableVariants(
 // ─── Letter lookup (used by CardItem badges) ──────────────────────────────
 export const VARIANT_LETTER: Record<string, string> = {
   normal:               'U',
+  unlimited:            'U', // older sets (e.g. Base Set 2)
   holofoil:             'H',
   reverseHolofoil:      'R',
   '1stEditionHolofoil': '1',
