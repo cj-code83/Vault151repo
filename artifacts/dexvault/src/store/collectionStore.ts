@@ -19,6 +19,8 @@ interface CollectionState {
   updateNotes: (cardId: string, notes: string, userId: string) => Promise<void>;
   /** Add every card in `cards` that isn't already owned. Returns { added, skipped }. */
   bulkAddCards: (cards: PokemonCard[], userId: string) => Promise<{ added: number; skipped: number }>;
+  /** Remove all cards with the given IDs from the collection (batch). */
+  bulkRemoveCards: (cardIds: string[], userId: string) => Promise<void>;
 }
 
 function isTableMissingError(error: { code?: string; message?: string }) {
@@ -544,5 +546,52 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       skipped > 0 ? { description: `${skipped} already owned — left untouched.` } : undefined,
     );
     return { added: totalAdded, skipped };
+  },
+
+  bulkRemoveCards: async (cardIds: string[], userId: string) => {
+    if (cardIds.length === 0) return;
+
+    const prev = get().collectionCards;
+
+    // Optimistic local remove
+    set((state) => {
+      const next = { ...state.collectionCards };
+      for (const id of cardIds) delete next[id];
+      return { collectionCards: next };
+    });
+
+    // PostgREST supports up to ~1000 items in .in(); chunk defensively
+    const CHUNK = 500;
+    let success = true;
+
+    for (let i = 0; i < cardIds.length; i += CHUNK) {
+      const chunk = cardIds.slice(i, i + CHUNK);
+      const { error } = await supabase
+        .from('collection_cards')
+        .delete()
+        .eq('user_id', userId)
+        .in('card_id', chunk);
+
+      if (error) {
+        success = false;
+        if (isTableMissingError(error)) set({ dbSetupRequired: true });
+        toast.error('Could not remove cards', { description: error.message });
+        break;
+      }
+    }
+
+    if (!success) {
+      // Rollback to previous state
+      set((state) => {
+        const next = { ...state.collectionCards };
+        for (const id of cardIds) {
+          if (prev[id]) next[id] = prev[id];
+        }
+        return { collectionCards: next };
+      });
+      return;
+    }
+
+    toast.success(`Removed ${cardIds.length} card${cardIds.length === 1 ? '' : 's'} from collection.`);
   },
 }));

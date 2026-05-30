@@ -3,27 +3,27 @@ import { PokemonCard } from '@/types/pokemon';
 import { useCollectionStore } from '@/store/collectionStore';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'wouter';
 import { getAvailableVariants, getStandardKeys, getVariantLetter } from '@/utils/variants';
+import btnMinus from '@/assets/btn-minus.png';
+import btnPlus  from '@/assets/btn-plus.png';
 
 // ─── Energy type colours ──────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
   Fire:       '#FF6B35',
   Water:      '#5DADE2',
-  Grass:      '#58D68D',
+  Grass:      '#52BE80',
   Lightning:  '#F4D03F',
-  Psychic:    '#C39BD3',
-  Fighting:   '#CA6F1E',
-  Darkness:   '#5D6D7E',
-  Metal:      '#A2A9B1',
-  Dragon:     '#8E44AD',
-  Fairy:      '#F48FB1',
+  Psychic:    '#AF7AC5',
+  Fighting:   '#CB4335',
   Colorless:  '#BDC3C7',
+  Darkness:   '#1C2833',
+  Metal:      '#808B96',
+  Dragon:     '#6E2DC3',
+  Fairy:      '#F48FB1',
 };
-
 
 // ─── Component ────────────────────────────────────────────────────────────
 
@@ -33,19 +33,16 @@ interface CardItemProps {
 
 export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const { user } = useAuth();
-  const { collectionCards, addCard, updateQuantity, removeCard } = useCollectionStore();
-
+  const { collectionCards, addCard, removeCard, updateQuantity } = useCollectionStore();
   const [imgLoaded, setImgLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
-      setImgLoaded(true);
-    }
-  }, [card.images.small]);
+    if (imgRef.current?.complete) setImgLoaded(true);
+  }, []);
 
   const owned      = user ? collectionCards[card.id] : null;
-  const genericQty = owned?.quantity || 0;
+  const genericQty = owned?.quantity ?? 0;
   const variantMap = owned?.variants ?? {};
   const variantQty = Object.values(variantMap).reduce((s, v) => s + v, 0);
   const totalQty   = genericQty + variantQty;
@@ -132,12 +129,11 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
           </div>
         ))}
 
-        {/* ── Info strip: type dots · − + buttons · card number ─────── */}
-        {/* All three items share the same h-6 row so they're visually aligned */}
+        {/* ── Info strip: type dots · pill buttons · card number ─────── */}
         <div className="mt-1.5 flex items-center justify-between gap-1 px-0.5">
 
           {/* Type colour dots */}
-          <div className="flex items-center gap-1 h-6">
+          <div className="flex items-center gap-1 h-6 shrink-0">
             {card.types?.map((type) => (
               <span
                 key={type}
@@ -146,42 +142,35 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
                 title={type}
               />
             ))}
-            {/* Spacer keeps layout stable for cards with no type (Trainer/Energy) */}
             {(!card.types || card.types.length === 0) && (
               <span className="w-3.5 h-3.5 opacity-0" />
             )}
           </div>
 
-          {/* Quick-action buttons — always visible */}
-          <div className="flex items-center gap-1">
+          {/* Quick-action pill buttons */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={handleQuickRemove}
               disabled={!canRemove}
-              className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-opacity
-                ${canRemove
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-muted text-muted-foreground opacity-40 cursor-default'}`}
-              aria-label="Quick remove"
+              className={`flex items-center transition-all active:scale-95 ${canRemove ? '' : 'opacity-30 cursor-default'}`}
+              aria-label="Remove one"
             >
-              <Minus className="w-3.5 h-3.5" />
+              <img src={btnMinus} alt="-" className="h-6 w-auto object-contain" draggable={false} />
             </button>
             <button
               onClick={handleQuickAdd}
               disabled={!user}
-              className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm hover:bg-green-600 transition-colors disabled:opacity-40 disabled:cursor-default"
-              aria-label="Quick add"
+              className={`flex items-center transition-all active:scale-95 ${user ? '' : 'opacity-30 cursor-default'}`}
+              aria-label="Add one"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <img src={btnPlus} alt="+" className="h-6 w-auto object-contain" draggable={false} />
             </button>
           </div>
 
           {/* Card number */}
-          <div className="flex items-center h-6">
-            <span className="text-[10px] text-muted-foreground font-mono leading-none">
-              #{card.number}
-            </span>
-          </div>
-
+          <span className="text-[10px] text-muted-foreground font-mono leading-none shrink-0">
+            #{card.number}
+          </span>
         </div>
       </motion.div>
     </Link>
