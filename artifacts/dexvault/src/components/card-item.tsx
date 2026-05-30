@@ -26,7 +26,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const STANDARD_KEYS = new Set(['normal', 'unlimitedNormal']);
+const STANDARD_KEYS = new Set(['normal', 'unlimitedNormal', 'unlimited']);
 
 // ─── Component ────────────────────────────────────────────────────────────
 
@@ -41,7 +41,6 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Already-cached images complete synchronously before the first paint
   useEffect(() => {
     if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
       setImgLoaded(true);
@@ -86,17 +85,19 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
     }
   };
 
+  const canRemove = !!owned && genericQty > 0;
+
   return (
     <Link href={`/card/${card.id}`}>
       <motion.div
         whileHover={{ y: -4, scale: 1.02 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className="group relative cursor-pointer"
+        className="relative cursor-pointer"
       >
         {/* ── Card image ────────────────────────────────────────────── */}
         <Card className="overflow-hidden border-border bg-card shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-2 relative aspect-[63/88]">
-            {/* Instant card-back gradient placeholder */}
+            {/* Card-back gradient placeholder */}
             <div
               className={`absolute inset-2 rounded-sm transition-opacity duration-200 ${imgLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
               style={{
@@ -111,28 +112,10 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
               className={`w-full h-full object-contain drop-shadow-md transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImgLoaded(true)}
             />
-
-            {/* +/- quick-action buttons — inside image area, shown on hover */}
-            <button
-              onClick={handleQuickAdd}
-              className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Quick add"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-            {genericQty > 0 && (
-              <button
-                onClick={handleQuickRemove}
-                className="absolute bottom-2 left-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                aria-label="Quick remove"
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-            )}
           </CardContent>
         </Card>
 
-        {/* Blue quantity badge — top right, outside card */}
+        {/* Blue quantity badge — top right */}
         {totalQty > 0 && (
           <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center shadow-md z-10 font-mono select-none">
             {totalQty}
@@ -150,21 +133,56 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
           </div>
         ))}
 
-        {/* ── Info strip: type dots + card number ───────────────────── */}
-        <div className="mt-1 flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-1">
+        {/* ── Info strip: type dots · − + buttons · card number ─────── */}
+        {/* All three items share the same h-6 row so they're visually aligned */}
+        <div className="mt-1.5 flex items-center justify-between gap-1 px-0.5">
+
+          {/* Type colour dots */}
+          <div className="flex items-center gap-1 h-6">
             {card.types?.map((type) => (
               <span
                 key={type}
-                className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                className="w-3.5 h-3.5 rounded-full flex-shrink-0"
                 style={{ background: TYPE_COLORS[type] ?? '#BDC3C7' }}
                 title={type}
               />
             ))}
+            {/* Spacer keeps layout stable for cards with no type (Trainer/Energy) */}
+            {(!card.types || card.types.length === 0) && (
+              <span className="w-3.5 h-3.5 opacity-0" />
+            )}
           </div>
-          <span className="text-[10px] text-muted-foreground font-mono leading-none">
-            #{card.number}
-          </span>
+
+          {/* Quick-action buttons — always visible */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleQuickRemove}
+              disabled={!canRemove}
+              className={`w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-opacity
+                ${canRemove
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-muted text-muted-foreground opacity-40 cursor-default'}`}
+              aria-label="Quick remove"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleQuickAdd}
+              disabled={!user}
+              className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm hover:bg-green-600 transition-colors disabled:opacity-40 disabled:cursor-default"
+              aria-label="Quick add"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Card number */}
+          <div className="flex items-center h-6">
+            <span className="text-[10px] text-muted-foreground font-mono leading-none">
+              #{card.number}
+            </span>
+          </div>
+
         </div>
       </motion.div>
     </Link>
