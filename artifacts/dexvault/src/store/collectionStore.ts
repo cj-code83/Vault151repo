@@ -38,39 +38,67 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
 
   fetchCollection: async (userId: string) => {
     set({ loading: true });
-    const { data, error } = await supabase
-      .from('collection_cards')
-      .select('*')
-      .eq('user_id', userId);
 
-    if (error) {
-      set({ loading: false });
-      if (isTableMissingError(error)) {
-        set({ dbSetupRequired: true });
-      } else {
-        toast.error('Could not load collection', { description: error.message });
+    /**
+     * PostgREST (Supabase) silently caps plain `.select()` queries at 1 000 rows.
+     * We paginate in PAGE_SIZE chunks until we receive a partial page, which
+     * signals the last page. This correctly handles collections of any size.
+     */
+    const PAGE_SIZE = 1000;
+    let page = 0;
+    const allRows: Record<string, unknown>[] = [];
+
+    while (true) {
+      const from = page * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+
+      const { data, error } = await supabase
+        .from('collection_cards')
+        .select('*')
+        .eq('user_id', userId)
+        .range(from, to);
+
+      if (error) {
+        set({ loading: false });
+        if (isTableMissingError(error)) {
+          set({ dbSetupRequired: true });
+        } else {
+          toast.error('Could not load collection', { description: error.message });
+        }
+        return;
       }
-      return;
+
+      if (data && data.length > 0) {
+        allRows.push(...(data as Record<string, unknown>[]));
+      }
+
+      // A page shorter than PAGE_SIZE means we've reached the last page
+      if (!data || data.length < PAGE_SIZE) break;
+
+      page++;
     }
 
-    if (data) {
-      const cardsRecord: Record<string, CollectionCard> = {};
-      data.forEach((item) => {
-        cardsRecord[item.card_id] = {
-          id: item.id,
-          userId: item.user_id,
-          cardId: item.card_id,
-          quantity: item.quantity,
-          condition: item.condition,
-          isFavorite: item.is_favorite,
-          isWishlisted: item.is_wishlisted,
-          notes: item.notes,
-          createdAt: item.created_at,
-          variants: item.variants ?? {},
-        };
-      });
-      set({ collectionCards: cardsRecord, loading: false, dbSetupRequired: false });
+    const cardsRecord: Record<string, CollectionCard> = {};
+    for (const item of allRows) {
+      const i = item as {
+        id: string; user_id: string; card_id: string; quantity: number;
+        condition: string; is_favorite: boolean; is_wishlisted: boolean;
+        notes: string | null; created_at: string; variants: Record<string, number> | null;
+      };
+      cardsRecord[i.card_id] = {
+        id:           i.id,
+        userId:       i.user_id,
+        cardId:       i.card_id,
+        quantity:     i.quantity,
+        condition:    i.condition,
+        isFavorite:   i.is_favorite,
+        isWishlisted: i.is_wishlisted,
+        notes:        i.notes ?? undefined,
+        createdAt:    i.created_at,
+        variants:     i.variants ?? {},
+      };
     }
+    set({ collectionCards: cardsRecord, loading: false, dbSetupRequired: false });
   },
 
   addCard: async (card: PokemonCard, userId: string) => {
