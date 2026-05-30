@@ -11,20 +11,16 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronLeft, Minus, Plus, Star, Heart, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getAvailableVariants, getVariantLetter, formatVariantName } from '@/utils/variants';
+import {
+  getAvailableVariants,
+  getStandardKeys,
+  getStandardLabel,
+  getVariantLetter,
+  formatVariantName,
+} from '@/utils/variants';
 import { PokemonCard } from '@/types/pokemon';
 
-// ─── Standard vs variant keys ─────────────────────────────────────────────
-// "Unlimited" (normal) is the standard printing. It is counted by the main
-// ± buttons, priced in the estimated-value header, and never shown in the
-// variant picker. Everything else (holofoil, reverse holo, 1st Edition …)
-// is a true variant and is tracked separately.
-// "unlimited" (no suffix) is used by some older sets (e.g. Base Set 2).
-const STANDARD_KEYS = new Set(['normal', 'unlimitedNormal', 'unlimited']);
-
 // ─── Find card in React Query in-memory cache ─────────────────────────────
-// Checks every cached search/set/collection/trending query so that navigating
-// from any grid page gives an instant render with no extra network call.
 function findCachedCard(qc: ReturnType<typeof useQueryClient>, id: string): PokemonCard | undefined {
   const direct = qc.getQueryData<PokemonCard>(['card', id]);
   if (direct) return direct;
@@ -33,49 +29,50 @@ function findCachedCard(qc: ReturnType<typeof useQueryClient>, id: string): Poke
     const found = res?.data?.find((c) => c.id === id);
     if (found) return found;
   }
-
   for (const [, res] of qc.getQueriesData<{ data: PokemonCard[] }>({ queryKey: ['set-cards-all'] })) {
     const found = res?.data?.find((c) => c.id === id);
     if (found) return found;
   }
-
   for (const [, cards] of qc.getQueriesData<PokemonCard[]>({ queryKey: ['collection-cards'] })) {
     const found = cards?.find((c) => c.id === id);
     if (found) return found;
   }
-
   const trending = qc.getQueryData<PokemonCard[]>(['trending-cards']);
   return trending?.find((c) => c.id === id);
 }
 
 // ─── Value calculation ────────────────────────────────────────────────────
+// standardKeys is dynamic per-card (see getStandardKeys in utils/variants).
 
 type AvailableVariants = ReturnType<typeof getAvailableVariants>;
 
 function calcEstimatedValue(
-  variantMap: Record<string, number>,
-  genericQty: number,
-  allVariants: AvailableVariants,
+  variantMap:   Record<string, number>,
+  genericQty:   number,
+  allVariants:  AvailableVariants,
+  standardKeys: Set<string>,
 ) {
-  const standardVariant = allVariants.find((v) => STANDARD_KEYS.has(v.key));
-  const nonStandard     = allVariants.filter((v) => !STANDARD_KEYS.has(v.key));
+  const standardVariant = allVariants.find((v) => standardKeys.has(v.key));
+  const nonStandard     = allVariants.filter((v) => !standardKeys.has(v.key));
 
-  const standardValue = standardVariant
-    ? genericQty * (standardVariant.price ?? 0)
-    : 0;
+  // Standard copies priced at the resolved standard variant's market price
+  const standardValue = standardVariant ? genericQty * (standardVariant.price ?? 0) : 0;
 
+  // Explicitly tracked non-standard variant copies
   const variantValue = nonStandard.reduce(
     (sum, v) => sum + (variantMap[v.key] ?? 0) * (v.price ?? 0),
     0,
   );
 
-  // Single-variant card with no standard key: that one variant IS the standard.
+  // Edge case: no standard key exists AND only one non-standard variant
+  // → treat that single variant as the de-facto standard so generic copies get priced
   if (!standardVariant && nonStandard.length === 1) {
-    const sv = nonStandard[0];
+    const sv    = nonStandard[0];
     const svQty = variantMap[sv.key] ?? 0;
     return { total: (genericQty + svQty) * (sv.price ?? 0), untrackedGeneric: 0 };
   }
 
+  // Generic copies when no standard price exists AND multiple variants → untrackable
   const untrackedGeneric =
     !standardVariant && nonStandard.length > 1 && genericQty > 0 ? genericQty : 0;
 
@@ -85,7 +82,7 @@ function calcEstimatedValue(
 // ─── Component ────────────────────────────────────────────────────────────
 
 export default function CardDetail() {
-  const [, params]     = useRoute('/card/:id');
+  const [, params]      = useRoute('/card/:id');
   const [, setLocation] = useLocation();
   const cardId = params?.id;
   const { user } = useAuth();
@@ -95,8 +92,8 @@ export default function CardDetail() {
     toggleWishlist, updateVariants, updateNotes,
   } = useCollectionStore();
 
-  const [notesValue, setNotesValue]     = useState<string | null>(null);
-  const [largeLoaded, setLargeLoaded]   = useState(false);
+  const [notesValue, setNotesValue]       = useState<string | null>(null);
+  const [largeLoaded, setLargeLoaded]     = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   const cachedCard = useMemo(
@@ -106,22 +103,17 @@ export default function CardDetail() {
 
   const { data: card, isLoading } = useQuery({
     queryKey: ['card', cardId],
-    queryFn: () => getCard(cardId!),
-    enabled: !!cardId,
+    queryFn:  () => getCard(cardId!),
+    enabled:  !!cardId,
     staleTime: 24 * 60 * 60 * 1000,
     placeholderData: cachedCard,
   });
 
-  // ── Back navigation ───────────────────────────────────────────────────
   const handleBack = () => {
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      setLocation('/sets');
-    }
+    if (window.history.length > 1) window.history.back();
+    else setLocation('/sets');
   };
 
-  // ── Remove from collection ────────────────────────────────────────────
   const handleRemove = async () => {
     if (!user || !card) return;
     await removeCard(card.id, user.id);
@@ -146,25 +138,30 @@ export default function CardDetail() {
 
   if (!card) return <div className="text-destructive pt-4">Card not found</div>;
 
-  const owned       = user ? collectionCards[card.id] : null;
-  const genericQty  = owned?.quantity || 0;
-  const variantMap  = owned?.variants ?? {};
-  const variantQty  = Object.values(variantMap).reduce((s, v) => s + v, 0);
-  const totalQty    = genericQty + variantQty;
+  const owned      = user ? collectionCards[card.id] : null;
+  const genericQty = owned?.quantity || 0;
+  const variantMap = owned?.variants ?? {};
+  const variantQty = Object.values(variantMap).reduce((s, v) => s + v, 0);
+  const totalQty   = genericQty + variantQty;
 
-  const currentNotes     = notesValue ?? owned?.notes ?? '';
-  const allVariants      = getAvailableVariants(card.tcgplayer?.prices);
-  const standardVariant  = allVariants.find((v) => STANDARD_KEYS.has(v.key));
-  const nonStdVariants   = allVariants.filter((v) => !STANDARD_KEYS.has(v.key));
+  // ── Dynamic standard-key resolution ─────────────────────────────────
+  // Priority: unlimited → holofoil → reverse holo (see utils/variants).
+  const standardKeys    = getStandardKeys(card.tcgplayer?.prices);
+  const standardLabel   = getStandardLabel(standardKeys);
 
-  const isSingleVariant  = !standardVariant && nonStdVariants.length === 1;
+  const allVariants     = getAvailableVariants(card.tcgplayer?.prices);
+  const standardVariant = allVariants.find((v) => standardKeys.has(v.key));
+  const nonStdVariants  = allVariants.filter((v) => !standardKeys.has(v.key));
+
+  // Single-variant: no standard key resolved AND only one non-standard → de-facto standard
+  const isSingleVariant = !standardVariant && nonStdVariants.length === 1;
 
   const effectiveTotalQty = isSingleVariant
     ? genericQty + (variantMap[nonStdVariants[0]?.key ?? ''] ?? 0)
     : totalQty;
 
   const { total: estimatedValue, untrackedGeneric } = calcEstimatedValue(
-    variantMap, genericQty, allVariants,
+    variantMap, genericQty, allVariants, standardKeys,
   );
 
   const handleVariantChange = async (key: string, delta: number) => {
@@ -183,7 +180,7 @@ export default function CardDetail() {
   const trackedVariantLetters = [
     ...new Set(
       Object.entries(variantMap)
-        .filter(([k, qty]) => qty > 0 && !STANDARD_KEYS.has(k))
+        .filter(([k, qty]) => qty > 0 && !standardKeys.has(k))
         .map(([k]) => getVariantLetter(k))
     ),
   ];
@@ -270,14 +267,16 @@ export default function CardDetail() {
           {/* Collection controls */}
           <Card className="border-border bg-card">
             <CardContent className="p-6">
+              {/* Standard-print price line — label is dynamic */}
               {standardVariant?.price != null && (
                 <p className="text-xs text-muted-foreground mb-3">
-                  Unlimited market price:{' '}
+                  {standardLabel} market price:{' '}
                   <span className="font-mono font-semibold text-green-600 dark:text-green-400">
                     ${standardVariant.price.toFixed(2)}
                   </span>
                 </p>
               )}
+
               <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
                 <div className="flex items-center gap-4 w-full sm:w-auto">
                   <div className="flex items-center">
@@ -315,18 +314,14 @@ export default function CardDetail() {
                 </div>
               </div>
 
-              {/* Remove from collection — shown when the card is tracked */}
+              {/* Remove from collection */}
               {owned && (
                 <div className="mt-4 pt-4 border-t border-border flex items-center gap-3">
                   {confirmRemove ? (
                     <>
                       <p className="text-sm text-destructive flex-1">Remove this card from your collection?</p>
-                      <Button size="sm" variant="destructive" onClick={handleRemove}>
-                        Yes, remove
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>
-                        Cancel
-                      </Button>
+                      <Button size="sm" variant="destructive" onClick={handleRemove}>Yes, remove</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>Cancel</Button>
                     </>
                   ) : (
                     <button
@@ -377,9 +372,12 @@ export default function CardDetail() {
               </div>
 
               {allVariants.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-1">No pricing data available for this card.</p>
+                <p className="text-xs text-muted-foreground py-1">
+                  No pricing data available for this card.
+                </p>
 
               ) : isSingleVariant ? (
+                // Only one price key and it's not in any standard group → de-facto standard
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
@@ -405,12 +403,14 @@ export default function CardDetail() {
                 </div>
 
               ) : nonStdVariants.length === 0 ? (
+                // Standard print only — no variant picker needed
                 <p className="text-xs text-muted-foreground py-1">
-                  This card is only available as the Unlimited print.
+                  This card is only available as the {standardLabel} print.
                   Use the ± buttons above to track your copies.
                 </p>
 
               ) : (
+                // Standard print + one or more true variants
                 <div className="divide-y divide-border">
                   {nonStdVariants.map(({ key, label, letter, price }) => {
                     const qty = variantMap[key] ?? 0;
@@ -444,7 +444,7 @@ export default function CardDetail() {
                     );
                   })}
 
-                  {/* Legacy variant rows: keys still in the DB but no longer in current pricing data */}
+                  {/* Legacy variant rows: keys in DB but no longer in current pricing data */}
                   {Object.entries(variantMap)
                     .filter(([k, qty]) => qty > 0 && !allVariants.some((v) => v.key === k))
                     .map(([key, qty]) => (
@@ -494,7 +494,7 @@ export default function CardDetail() {
                 <div className="font-semibold text-sm mb-2">Notes</div>
                 <Textarea
                   placeholder="Add notes about condition, purchase price, grading…"
-                  value={currentNotes}
+                  value={notesValue ?? owned?.notes ?? ''}
                   onChange={(e) => setNotesValue(e.target.value)}
                   onBlur={handleNotesSave}
                   rows={3}

@@ -81,6 +81,56 @@ export function formatVariantName(key: string): string {
     .trim();
 }
 
+// ─── Dynamic standard-key resolution ─────────────────────────────────────
+//
+// "Standard" means the print that the ± buttons track and that contributes
+// to the estimated-value header.  The priority is:
+//   1. Unlimited  (normal / unlimitedNormal / unlimited)
+//   2. Holofoil   (holofoil / unlimitedHolofoil)          — if no unlimited exists
+//   3. Reverse Holo (reverseHolofoil)                     — if no unlimited or holo exists
+//
+// Any print not in the resolved standard group becomes a tracked variant row.
+
+const STANDARD_GROUPS: string[][] = [
+  ['normal', 'unlimitedNormal', 'unlimited'],
+  ['holofoil', 'unlimitedHolofoil'],
+  ['reverseHolofoil'],
+];
+
+/**
+ * Returns the Set of price keys that represent the "standard" printing for
+ * this card, based on which TCGPlayer price keys are actually present.
+ * Returns an empty Set when prices is undefined or no known keys are found.
+ */
+export function getStandardKeys(
+  prices: Record<string, { market?: number; mid?: number }> | undefined
+): Set<string> {
+  if (!prices) return new Set();
+  const available = new Set(Object.keys(prices));
+  for (const group of STANDARD_GROUPS) {
+    const matched = group.filter((k) => available.has(k));
+    if (matched.length > 0) return new Set(matched);
+  }
+  return new Set();
+}
+
+/**
+ * Human-readable label for the standard printing, e.g. "Unlimited",
+ * "Holofoil", "Reverse Holo".  Used as a price-row prefix in card-detail.
+ */
+export function getStandardLabel(standardKeys: Set<string>): string {
+  if (standardKeys.has('normal') || standardKeys.has('unlimitedNormal') || standardKeys.has('unlimited')) {
+    return 'Unlimited';
+  }
+  if (standardKeys.has('holofoil') || standardKeys.has('unlimitedHolofoil')) {
+    return 'Holofoil';
+  }
+  if (standardKeys.has('reverseHolofoil')) {
+    return 'Reverse Holo';
+  }
+  return 'Standard';
+}
+
 // ─── Static preset list kept only for legacy reference ────────────────────
 export const PRESET_VARIANTS = [
   { key: 'holofoil',            label: 'Holofoil',         letter: 'H' },

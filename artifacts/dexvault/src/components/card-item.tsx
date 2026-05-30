@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Link } from 'wouter';
-import { getAvailableVariants, getVariantLetter } from '@/utils/variants';
+import { getAvailableVariants, getStandardKeys, getVariantLetter } from '@/utils/variants';
 
 // ─── Energy type colours ──────────────────────────────────────────────────
 
@@ -24,9 +24,6 @@ const TYPE_COLORS: Record<string, string> = {
   Colorless:  '#BDC3C7',
 };
 
-// ─── Constants ────────────────────────────────────────────────────────────
-
-const STANDARD_KEYS = new Set(['normal', 'unlimitedNormal', 'unlimited']);
 
 // ─── Component ────────────────────────────────────────────────────────────
 
@@ -53,14 +50,16 @@ export const CardItem = memo(function CardItem({ card }: CardItemProps) {
   const variantQty = Object.values(variantMap).reduce((s, v) => s + v, 0);
   const totalQty   = genericQty + variantQty;
 
+  // Standard keys are resolved per-card: unlimited → holofoil → reverse holo
+  const standardKeys      = getStandardKeys(card.tcgplayer?.prices);
   const availableVariants = getAvailableVariants(card.tcgplayer?.prices);
   const trackedVariantLetters = [
     ...new Set(
       Object.entries(variantMap)
-        .filter(([k, qty]) => qty > 0 && !STANDARD_KEYS.has(k))
+        .filter(([k, qty]) => qty > 0 && !standardKeys.has(k))
         .map(([k]) => getVariantLetter(k))
     ),
-  ].filter(() => availableVariants.some((v) => !STANDARD_KEYS.has(v.key)))
+  ].filter(() => availableVariants.some((v) => !standardKeys.has(v.key)))
    .slice(0, 4);
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
