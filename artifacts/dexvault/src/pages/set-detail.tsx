@@ -3,7 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { searchCards, getSets } from '@/services/pokemonTcg';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Plus, Loader2, CheckCheck } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { CardItem } from '@/components/card-item';
 import { useCollectionStore } from '@/store/collectionStore';
+import { useAuth } from '@/hooks/use-auth';
 import { PokemonCard } from '@/types/pokemon';
 import { useEffect, useState, useMemo } from 'react';
 import { sortCards, SortOrder, SORT_OPTIONS } from '@/utils/sort';
@@ -35,10 +36,12 @@ function sortCardNumbers(nums: string[]): string[] {
 export default function SetDetail() {
   const { id: setId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
-  const { collectionCards } = useCollectionStore();
+  const { user } = useAuth();
+  const { collectionCards, bulkAddCards } = useCollectionStore();
   const [allCards, setAllCards] = useState<PokemonCard[]>([]);
   const [numberFilter, setNumberFilter] = useState('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('number');
+  const [adding, setAdding] = useState(false);
 
   const { data: setsData } = useQuery({
     queryKey: ['sets'],
@@ -91,6 +94,23 @@ export default function SetDetail() {
   ).length;
   const total = set?.printedTotal || set?.total || allCards.length || 0;
   const pct   = total > 0 ? Math.min(100, Math.round((owned / total) * 100)) : 0;
+
+  // Cards currently visible that aren't yet in the collection
+  const notYetOwned = useMemo(
+    () => displayedCards.filter((c) => !collectionCards[c.id]),
+    [displayedCards, collectionCards]
+  );
+  const allAlreadyOwned = displayedCards.length > 0 && notYetOwned.length === 0;
+
+  const handleAddAll = async () => {
+    if (!user || adding || notYetOwned.length === 0) return;
+    setAdding(true);
+    try {
+      await bulkAddCards(notYetOwned, user.id);
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
     <div className="flex flex-col">
@@ -148,7 +168,7 @@ export default function SetDetail() {
           </div>
         )}
 
-        {/* Row 3: number filter + sort */}
+        {/* Row 3: number filter + sort + quick-add-all */}
         {allCards.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             {/* Number filter */}
@@ -194,6 +214,36 @@ export default function SetDetail() {
                   {displayedCards.length} card{displayedCards.length !== 1 ? 's' : ''}
                 </span>
               </>
+            )}
+
+            {/* Quick-add-all — only shown when logged in and cards are loaded */}
+            {user && displayedCards.length > 0 && (
+              <Button
+                size="sm"
+                variant={allAlreadyOwned ? 'ghost' : 'secondary'}
+                className={`ml-auto h-8 text-xs gap-1.5 shrink-0 ${allAlreadyOwned ? 'text-green-600 dark:text-green-400 pointer-events-none' : ''}`}
+                onClick={handleAddAll}
+                disabled={adding || allAlreadyOwned}
+              >
+                {adding ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Adding…
+                  </>
+                ) : allAlreadyOwned ? (
+                  <>
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    All owned
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5" />
+                    Add all{notYetOwned.length < displayedCards.length
+                      ? ` (${notYetOwned.length})`
+                      : ` (${displayedCards.length})`}
+                  </>
+                )}
+              </Button>
             )}
           </div>
         )}

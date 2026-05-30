@@ -17,6 +17,8 @@ interface CollectionState {
   updateCondition: (cardId: string, condition: string, userId: string) => Promise<void>;
   updateVariants: (cardId: string, variants: Record<string, number>, userId: string, cardForCreate?: PokemonCard) => Promise<void>;
   updateNotes: (cardId: string, notes: string, userId: string) => Promise<void>;
+  /** Add every card in `cards` that isn't already owned. Returns { added, skipped }. */
+  bulkAddCards: (cards: PokemonCard[], userId: string) => Promise<{ added: number; skipped: number }>;
 }
 
 function isTableMissingError(error: { code?: string; message?: string }) {
@@ -466,5 +468,81 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       }));
       toast.error('Could not update variants', { description: error.message });
     }
+  },
+
+  bulkAddCards: async (cards: PokemonCard[], userId: string) => {
+    const existing = get().collectionCards;
+    // Only insert cards with no existing record (leaves wishlisted-only cards untouched)
+    const toAdd = cards.filter((c) => !existing[c.id]);
+
+    if (toAdd.length === 0) {
+      toast.info('All cards already in your collection.');
+      return { added: 0, skipped: cards.length };
+    }
+
+    const rows = toAdd.map((card) => ({
+      user_id:      userId,
+      card_id:      card.id,
+      quantity:     1,
+      condition:    'Near Mint',
+      is_favorite:  false,
+      is_wishlisted: false,
+      variants:     {},
+      notes:        null,
+    }));
+
+    // Supabase handles ~250 rows fine in one call; chunk if ever larger
+    const CHUNK = 100;
+    let totalAdded = 0;
+    const allInserted: CollectionCard[] = [];
+
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const { data, error } = await supabase
+        .from('collection_cards')
+        .upsert(chunk, { onConflict: 'user_id,card_id', ignoreDuplicates: true })
+        .select();
+
+      if (error) {
+        if (isTableMissingError(error)) set({ dbSetupRequired: true });
+        toast.error('Could not add cards', { description: error.message });
+        return { added: totalAdded, skipped: cards.length - totalAdded };
+      }
+
+      if (data) {
+        totalAdded += data.length;
+        for (const row of data) {
+          allInserted.push({
+            id:           row.id,
+            userId:       row.user_id,
+            cardId:       row.card_id,
+            quantity:     row.quantity,
+            condition:    row.condition,
+            isFavorite:   row.is_favorite,
+            isWishlisted: row.is_wishlisted,
+            notes:        row.notes ?? undefined,
+            createdAt:    row.created_at,
+            variants:     row.variants ?? {},
+          });
+        }
+      }
+    }
+
+    // Optimistic local update
+    set((state) => {
+      const next = { ...state.collectionCards };
+      for (const cc of allInserted) next[cc.cardId] = cc;
+      return { collectionCards: next };
+    });
+
+    // Fire-and-forget cache writes
+    toAdd.forEach((card) => writeCardToCache(card));
+
+    const skipped = cards.length - toAdd.length;
+    toast.success(
+      `Added ${totalAdded} card${totalAdded === 1 ? '' : 's'} to your collection.`,
+      skipped > 0 ? { description: `${skipped} already owned — left untouched.` } : undefined,
+    );
+    return { added: totalAdded, skipped };
   },
 }));
