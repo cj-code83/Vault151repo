@@ -15,6 +15,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { fetchEntireCollection } from './supabaseHelpers';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -122,21 +123,24 @@ export async function parseBackupFile(file: File): Promise<CollectionBackup> {
 /**
  * Export the authenticated user's collection to a downloadable JSON file.
  *
+ * Uses fetchEntireCollection() to paginate through all records — collections
+ * larger than 1 000 cards are exported completely.
+ *
  * Only reads collection_cards rows for the given userId — never reads
  * card_cache, pricing data, set data, images, or other users' rows.
  */
 export async function exportCollection(userId: string): Promise<void> {
-  const { data, error } = await supabase
-    .from('collection_cards')
-    .select('card_id, quantity, variants, is_favorite, is_wishlisted, notes')
-    .eq('user_id', userId);
+  let rows: Awaited<ReturnType<typeof fetchEntireCollection>>;
 
-  if (error) {
-    toast.error('Export failed', { description: error.message });
+  try {
+    rows = await fetchEntireCollection(userId);
+  } catch (error: unknown) {
+    const e = error as { message?: string };
+    toast.error('Export failed', { description: e.message });
     return;
   }
 
-  const cards: BackupCard[] = (data ?? []).map((row) => ({
+  const cards: BackupCard[] = rows.map((row) => ({
     cardId:       row.card_id,
     quantity:     row.quantity ?? 0,
     variants:     (row.variants as Record<string, number>) ?? {},
@@ -157,13 +161,15 @@ export async function exportCollection(userId: string): Promise<void> {
   const dateStr = new Date().toISOString().slice(0, 10);
   const anchor  = document.createElement('a');
   anchor.href     = url;
-  anchor.download = `pokemon-collection-backup-${dateStr}.json`;
+  anchor.download = `dexvault-collection-${dateStr}.json`;
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
 
-  toast.success(`Exported ${cards.length} collection entries.`);
+  toast.success(
+    `Exported ${cards.length} card${cards.length === 1 ? '' : 's'} successfully.`,
+  );
 }
 
 /**
@@ -203,30 +209,36 @@ export async function importCollection(
   // ── Write imported cards ───────────────────────────────────────────────
   // condition is not stored in backups (it's operational state); default it.
   const rows = backup.cards.map((card) => ({
-    user_id:      userId,
-    card_id:      card.cardId,
-    quantity:     card.quantity ?? 0,
-    variants:     card.variants ?? {},
-    is_favorite:  card.isFavorite ?? false,
+    user_id:       userId,
+    card_id:       card.cardId,
+    quantity:      card.quantity ?? 0,
+    variants:      card.variants ?? {},
+    is_favorite:   card.isFavorite ?? false,
     is_wishlisted: card.isWishlisted ?? false,
-    notes:        card.notes ?? null,
-    condition:    'Near Mint',
+    notes:         card.notes ?? null,
+    condition:     'Near Mint',
   }));
 
   if (rows.length > 0) {
-    // Batch upsert — onConflict handles both insert-new and overwrite-existing.
-    const { error: upsertError } = await supabase
-      .from('collection_cards')
-      .upsert(rows, { onConflict: 'user_id,card_id' });
+    // Batch upsert in chunks — onConflict handles insert-new and overwrite-existing.
+    const CHUNK = 500;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const chunk = rows.slice(i, i + CHUNK);
+      const { error: upsertError } = await supabase
+        .from('collection_cards')
+        .upsert(chunk, { onConflict: 'user_id,card_id' });
 
-    if (upsertError) {
-      toast.error('Import failed — could not write cards', {
-        description: upsertError.message,
-      });
-      return false;
+      if (upsertError) {
+        toast.error('Import failed — could not write cards', {
+          description: upsertError.message,
+        });
+        return false;
+      }
     }
   }
 
-  toast.success(`Imported ${backup.cards.length} collection entries successfully.`);
+  toast.success(
+    `Imported ${backup.cards.length} card${backup.cards.length === 1 ? '' : 's'} successfully.`,
+  );
   return true;
 }

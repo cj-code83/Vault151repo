@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { CollectionCard, PokemonCard } from '../types/pokemon';
 import { supabase } from '../lib/supabase';
 import { writeCardToCache } from '../services/pokemonTcg';
+import { fetchEntireCollection } from '../utils/supabaseHelpers';
 
 interface CollectionState {
   collectionCards: Record<string, CollectionCard>;
@@ -54,53 +55,24 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
   fetchCollection: async (userId: string) => {
     set({ loading: true });
 
-    /**
-     * PostgREST (Supabase) silently caps plain `.select()` queries at 1 000 rows.
-     * We paginate in PAGE_SIZE chunks until we receive a partial page, which
-     * signals the last page. This correctly handles collections of any size.
-     */
-    const PAGE_SIZE = 1000;
-    let page = 0;
-    const allRows: Record<string, unknown>[] = [];
-
-    while (true) {
-      const from = page * PAGE_SIZE;
-      const to   = from + PAGE_SIZE - 1;
-
-      const { data, error } = await supabase
-        .from('collection_cards')
-        .select('*')
-        .eq('user_id', userId)
-        .range(from, to);
-      
-      if (error) {
-        logError('fetchCollection', error);
-        set({ loading: false });
-        if (isTableMissingError(error)) {
-          set({ dbSetupRequired: true });
-        } else {
-          toast.error('Could not load collection', { description: error.message });
-        }
-        return;
+    let allRows: Awaited<ReturnType<typeof fetchEntireCollection>>;
+    try {
+      // fetchEntireCollection paginates automatically — no 1 000-row cap.
+      allRows = await fetchEntireCollection(userId);
+    } catch (error: unknown) {
+      const e = error as { code?: string; message?: string; details?: string; hint?: string };
+      logError('fetchCollection', e);
+      set({ loading: false });
+      if (isTableMissingError(e)) {
+        set({ dbSetupRequired: true });
+      } else {
+        toast.error('Could not load collection', { description: e.message });
       }
-
-      if (data && data.length > 0) {
-        allRows.push(...(data as Record<string, unknown>[]));
-      }
-
-      // A page shorter than PAGE_SIZE means we've reached the last page
-      if (!data || data.length < PAGE_SIZE) break;
-
-      page++;
+      return;
     }
 
     const cardsRecord: Record<string, CollectionCard> = {};
-    for (const item of allRows) {
-      const i = item as {
-        id: string; user_id: string; card_id: string; quantity: number;
-        condition: string; is_favorite: boolean; is_wishlisted: boolean;
-        notes: string | null; created_at: string; variants: Record<string, number> | null;
-      };
+    for (const i of allRows) {
       cardsRecord[i.card_id] = {
         id:           i.id,
         userId:       i.user_id,

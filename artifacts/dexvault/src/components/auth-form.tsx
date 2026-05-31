@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { LogIn, UserPlus } from 'lucide-react';
+import { LogIn, Loader2, Mail, UserPlus } from 'lucide-react';
+import { toast as sonnerToast } from 'sonner';
 
 const authSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -18,11 +19,18 @@ const authSchema = z.object({
 
 type AuthFormData = z.infer<typeof authSchema>;
 
+type Mode = 'signin' | 'signup' | 'forgot';
+
 export function AuthForm() {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode,      setMode]      = useState<Mode>('signin');
   const [isLoading, setIsLoading] = useState(false);
-  const [, setLocation] = useLocation();
+  const [, setLocation]           = useLocation();
   const { toast } = useToast();
+
+  // Forgot-password state (separate from the main form)
+  const [forgotEmail,   setForgotEmail]   = useState('');
+  const [forgotSent,    setForgotSent]    = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<AuthFormData>({
     resolver: zodResolver(authSchema),
@@ -31,9 +39,8 @@ export function AuthForm() {
 
   const onSubmit = async (data: AuthFormData) => {
     setIsLoading(true);
-    
     try {
-      if (isSignUp) {
+      if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
@@ -48,11 +55,12 @@ export function AuthForm() {
         if (error) throw error;
         setLocation('/dashboard');
       }
-    } catch (error: any) {
-      toast({ 
-        title: 'Authentication Error', 
-        description: error.message || 'Something went wrong', 
-        variant: 'destructive' 
+    } catch (error: unknown) {
+      const e = error as { message?: string };
+      toast({
+        title: 'Authentication Error',
+        description: e.message || 'Something went wrong',
+        variant: 'destructive'
       });
     } finally {
       setIsLoading(false);
@@ -63,30 +71,131 @@ export function AuthForm() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
+        options: { redirectTo: `${window.location.origin}/dashboard` }
       });
       if (error) throw error;
-    } catch (error: any) {
-      toast({ 
-        title: 'Google Sign In Error', 
-        description: error.message || 'Could not sign in with Google', 
-        variant: 'destructive' 
+    } catch (error: unknown) {
+      const e = error as { message?: string };
+      toast({
+        title: 'Google Sign In Error',
+        description: e.message || 'Could not sign in with Google',
+        variant: 'destructive'
       });
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!forgotEmail.trim()) {
+      sonnerToast.error('Please enter your email address.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      // Build redirect URL that works regardless of the app's base path
+      const resetUrl = `${window.location.origin}${import.meta.env.BASE_URL}reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail.trim(), {
+        redirectTo: resetUrl,
+      });
+      if (error) throw error;
+      setForgotSent(true);
+    } catch (error: unknown) {
+      const e = error as { message?: string };
+      sonnerToast.error('Could not send reset email.', { description: e.message });
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // ── Forgot password panel ──────────────────────────────────────────────
+  if (mode === 'forgot') {
+    return (
+      <Card className="w-full max-w-md mx-auto border-border bg-card">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold tracking-tight">Reset Password</CardTitle>
+          <CardDescription>
+            {forgotSent
+              ? 'Check your inbox for a password reset link.'
+              : "Enter your account email and we'll send you a reset link."}
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          {forgotSent ? (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
+                A reset link was sent to <span className="font-medium text-foreground">{forgotEmail}</span>.
+                The link expires in 1 hour. Check your spam folder if you don't see it.
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setForgotSent(false);
+                  setForgotEmail('');
+                  setMode('signin');
+                }}
+              >
+                Back to Sign In
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email address</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  disabled={forgotLoading}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleForgotPassword(); }}
+                />
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={handleForgotPassword}
+                disabled={forgotLoading || !forgotEmail.trim()}
+              >
+                {forgotLoading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Mail className="w-4 h-4" />
+                }
+                {forgotLoading ? 'Sending…' : 'Send Reset Link'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+
+        {!forgotSent && (
+          <CardFooter>
+            <button
+              className="text-sm text-muted-foreground hover:text-primary transition-colors mx-auto"
+              onClick={() => setMode('signin')}
+            >
+              Back to Sign In
+            </button>
+          </CardFooter>
+        )}
+      </Card>
+    );
+  }
+
+  // ── Sign-in / Sign-up panel ────────────────────────────────────────────
   return (
     <Card className="w-full max-w-md mx-auto border-border bg-card">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold tracking-tight">
-          {isSignUp ? 'Create an account' : 'Welcome back'}
+          {mode === 'signup' ? 'Create an account' : 'Welcome back'}
         </CardTitle>
         <CardDescription>
-          {isSignUp ? 'Enter your details below to create your account' : 'Enter your email to sign in to your account'}
+          {mode === 'signup'
+            ? 'Enter your details below to create your account'
+            : 'Enter your email to sign in to your account'}
         </CardDescription>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
@@ -99,6 +208,7 @@ export function AuthForm() {
             Continue with Google
           </Button>
         </div>
+
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
             <span className="w-full border-t border-border" />
@@ -107,35 +217,50 @@ export function AuthForm() {
             <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
           </div>
         </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" placeholder="m@example.com" {...register('email')} />
             {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              {mode === 'signin' && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => { setForgotEmail(''); setForgotSent(false); setMode('forgot'); }}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             <Input id="password" type="password" {...register('password')} />
             {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
           </div>
+
           <Button className="w-full" type="submit" disabled={isLoading}>
             {isLoading ? (
-              <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-            ) : isSignUp ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : mode === 'signup' ? (
               <UserPlus className="w-4 h-4 mr-2" />
             ) : (
               <LogIn className="w-4 h-4 mr-2" />
             )}
-            {isSignUp ? 'Sign Up' : 'Sign In'}
+            {mode === 'signup' ? 'Sign Up' : 'Sign In'}
           </Button>
         </form>
       </CardContent>
+
       <CardFooter>
         <button
           className="text-sm text-muted-foreground hover:text-primary transition-colors mx-auto"
-          onClick={() => setIsSignUp(!isSignUp)}
+          onClick={() => setMode(mode === 'signup' ? 'signin' : 'signup')}
         >
-          {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+          {mode === 'signup' ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
         </button>
       </CardFooter>
     </Card>

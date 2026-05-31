@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 
 import { Layout } from "@/components/layout";
 import Landing from "@/pages/landing";
+import ResetPassword from "@/pages/reset-password";
 import Dashboard from "@/pages/dashboard";
 import Search from "@/pages/search";
 import Sets from "@/pages/sets";
@@ -70,6 +71,7 @@ function Router() {
       <CollectionInitializer />
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
         <Route path="/search"><ProtectedRoute component={Search} /></Route>
         <Route path="/sets"><ProtectedRoute component={Sets} /></Route>
