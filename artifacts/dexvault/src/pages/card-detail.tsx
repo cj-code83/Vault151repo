@@ -110,8 +110,13 @@ export default function CardDetail() {
   });
 
   const handleBack = () => {
-    if (window.history.length > 1) window.history.back();
-    else setLocation('/sets');
+    if (window.history.length > 1) {
+      window.history.back();
+    } else if (card?.set?.id) {
+      setLocation(`/sets/${card.set.id}`);
+    } else {
+      setLocation('/sets');
+    }
   };
 
   const handleRemove = async () => {

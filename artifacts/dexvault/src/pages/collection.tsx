@@ -199,6 +199,7 @@ function SetRow({
   set,
   standardOwned, standardTotal, standardPct, standardComplete,
   masterComplete,
+  extraOwned, extraTotal, extraPct, extraComplete, hasMasterCards,
   onClick, index,
 }: {
   set: PokemonSet;
@@ -207,6 +208,11 @@ function SetRow({
   standardPct: number;
   standardComplete: boolean;
   masterComplete: boolean;
+  extraOwned: number;
+  extraTotal: number;
+  extraPct: number;
+  extraComplete: boolean;
+  hasMasterCards: boolean;
   onClick: () => void;
   index: number;
 }) {
@@ -242,6 +248,7 @@ function SetRow({
             {set.releaseDate} · {standardTotal || set.total} cards
           </p>
           <div className="mt-2 space-y-1">
+            {/* Standard bar */}
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">{standardOwned} / {standardTotal || set.total} owned</span>
               <span className={`font-semibold ${
@@ -258,6 +265,27 @@ function SetRow({
                 style={{ width: `${standardPct}%` }}
               />
             </div>
+            {/* Extra / secret-rare bar */}
+            {hasMasterCards && (
+              <>
+                <div className="flex items-center justify-between text-xs mt-0.5">
+                  <span className="text-muted-foreground">{extraOwned} / {extraTotal} extra</span>
+                  <span className={`font-semibold ${
+                    extraComplete ? 'text-yellow-500' : extraPct > 0 ? 'text-yellow-500/80' : 'text-muted-foreground'
+                  }`}>
+                    {extraPct}%
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      extraComplete ? 'bg-yellow-500' : 'bg-yellow-400/60'
+                    }`}
+                    style={{ width: `${extraPct}%` }}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -329,6 +357,18 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
         const masterTotal   = set.total ?? 0;
         const masterComplete = masterTotal > 0 && masterOwned >= masterTotal;
 
+        // Extra: cards with number > printedTotal (secret rares, illustration rares, etc.)
+        const extraOwnedIds = setOwnedIds.filter((id) => {
+          const suffix = id.slice(prefix.length);
+          const n = parseInt(suffix, 10);
+          return isNaN(n) || (printedTotal > 0 && n > printedTotal);
+        });
+        const extraOwned    = extraOwnedIds.length;
+        const extraTotal    = Math.max(0, masterTotal - printedTotal);
+        const extraPct      = extraTotal > 0 ? Math.min(100, Math.round((extraOwned / extraTotal) * 100)) : 0;
+        const extraComplete  = extraTotal > 0 && extraOwned >= extraTotal;
+        const hasMasterCards = masterTotal > printedTotal && printedTotal > 0;
+
         return {
           set,
           ownedIds: setOwnedIds,
@@ -339,6 +379,11 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
           masterOwned,
           masterTotal,
           masterComplete,
+          extraOwned,
+          extraTotal,
+          extraPct,
+          extraComplete,
+          hasMasterCards,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -405,6 +450,11 @@ function OwnedBySet({ ownedIds }: { ownedIds: string[] }) {
           standardPct={entry.standardPct}
           standardComplete={entry.standardComplete}
           masterComplete={entry.masterComplete}
+          extraOwned={entry.extraOwned}
+          extraTotal={entry.extraTotal}
+          extraPct={entry.extraPct}
+          extraComplete={entry.extraComplete}
+          hasMasterCards={entry.hasMasterCards}
           index={i}
           onClick={() => setSelectedSetId(entry.set.id)}
         />

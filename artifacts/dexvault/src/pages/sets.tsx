@@ -65,6 +65,18 @@ function getSetCompletion(
   const masterTotal   = set.total ?? 0;
   const masterComplete = masterTotal > 0 && masterOwned >= masterTotal;
 
+  // Extra: cards with number > printedTotal (secret rares, illustration rares, etc.)
+  const extraOwnedCards = ownedInSet.filter((cc) => {
+    const suffix = cc.cardId.slice(prefix.length);
+    const n = parseInt(suffix, 10);
+    return isNaN(n) || (printedTotal > 0 && n > printedTotal);
+  });
+  const extraOwned    = extraOwnedCards.length;
+  const extraTotal    = Math.max(0, masterTotal - printedTotal);
+  const extraPct      = extraTotal > 0 ? Math.min(100, Math.round((extraOwned / extraTotal) * 100)) : 0;
+  const extraComplete  = extraTotal > 0 && extraOwned >= extraTotal;
+  const hasMasterCards = masterTotal > printedTotal && printedTotal > 0;
+
   return {
     standardOwned,
     standardTotal,
@@ -73,6 +85,11 @@ function getSetCompletion(
     masterOwned,
     masterTotal,
     masterComplete,
+    extraOwned,
+    extraTotal,
+    extraPct,
+    extraComplete,
+    hasMasterCards,
   };
 }
 
@@ -126,8 +143,9 @@ export default function Sets() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {eraSets.map((set, i) => {
                 const {
-                  standardOwned, standardTotal, standardPct,
-                  standardComplete, masterComplete,
+                  standardOwned, standardTotal, standardPct, standardComplete,
+                  masterComplete,
+                  extraOwned, extraTotal, extraPct, extraComplete, hasMasterCards,
                 } = getSetCompletion(set, collectionCards);
 
                 return (
@@ -169,6 +187,7 @@ export default function Sets() {
                           {set.releaseDate} · {standardTotal || set.total} cards
                         </p>
                         <div className="mt-2 space-y-1">
+                          {/* Standard bar */}
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">
                               {standardOwned} / {standardTotal || set.total} owned
@@ -187,6 +206,29 @@ export default function Sets() {
                               style={{ width: `${standardPct}%` }}
                             />
                           </div>
+                          {/* Extra / secret-rare bar */}
+                          {hasMasterCards && (
+                            <>
+                              <div className="flex items-center justify-between text-xs mt-0.5">
+                                <span className="text-muted-foreground">
+                                  {extraOwned} / {extraTotal} extra
+                                </span>
+                                <span className={`font-semibold ${
+                                  extraComplete ? 'text-yellow-500' : extraPct > 0 ? 'text-yellow-500/80' : 'text-muted-foreground'
+                                }`}>
+                                  {extraPct}%
+                                </span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    extraComplete ? 'bg-yellow-500' : 'bg-yellow-400/60'
+                                  }`}
+                                  style={{ width: `${extraPct}%` }}
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
