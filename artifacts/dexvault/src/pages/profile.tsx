@@ -522,7 +522,10 @@ export default function Profile() {
   };
 
   const handleSaveEmail = async (email: string) => {
-    const { error } = await supabase.auth.updateUser({ email });
+    const { error } = await supabase.auth.updateUser(
+      { email },
+      { emailRedirectTo: window.location.origin },
+    );
     if (error) { toast.error('Could not update email', { description: error.message }); throw error; }
     toast.success('Confirmation email sent.', {
       description: 'Check your new address for a confirmation link to complete the change.',
