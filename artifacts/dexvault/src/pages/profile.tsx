@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useCollectionStore } from '@/store/collectionStore';
 import { supabase } from '@/lib/supabase';
@@ -41,7 +41,7 @@ create table if not exists collection_cards (
   unique(user_id, card_id)
 );
 alter table collection_cards enable row level security;
-create policy "Users manage own cards" on collection_cards
+create or replace policy "Users manage own cards" on collection_cards
   for all using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
@@ -53,7 +53,7 @@ create table if not exists profiles (
   updated_at timestamptz default now()
 );
 alter table profiles enable row level security;
-create policy "Users manage own profile" on profiles
+create or replace policy "Users manage own profile" on profiles
   for all using (auth.uid() = id)
   with check (auth.uid() = id);
 
@@ -70,10 +70,10 @@ create table if not exists card_cache (
   cached_at timestamptz not null default now()
 );
 alter table card_cache enable row level security;
-create policy "card_cache_public_read"  on card_cache for select using (true);
-create policy "card_cache_auth_write"   on card_cache for insert
+create or replace policy "card_cache_public_read"  on card_cache for select using (true);
+create or replace policy "card_cache_auth_write"   on card_cache for insert
   with check (auth.role() = 'authenticated');
-create policy "card_cache_auth_update"  on card_cache for update
+create or replace policy "card_cache_auth_update"  on card_cache for update
   using (auth.role() = 'authenticated');`;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -459,9 +459,23 @@ export default function Profile() {
   const { dbSetupRequired, fetchCollection }                 = useCollectionStore();
 
   const fileInputRef                                          = useRef<HTMLInputElement>(null);
-  const [exporting,    setExporting]                         = useState(false);
-  const [importing,    setImporting]                         = useState(false);
-  const [pendingBackup, setPendingBackup]                    = useState<CollectionBackup | null>(null);
+  const [exporting,      setExporting]                       = useState(false);
+  const [importing,      setImporting]                       = useState(false);
+  const [pendingBackup,  setPendingBackup]                   = useState<CollectionBackup | null>(null);
+  // undefined = checking, true = exists (hide setup card), false = missing (show setup card)
+  const [cacheTableExists, setCacheTableExists]              = useState<boolean | undefined>(undefined);
+
+  // Probe card_cache table once on mount so we can hide the setup card when it already exists
+  useEffect(() => {
+    supabase
+      .from('card_cache')
+      .select('card_id')
+      .limit(1)
+      .then(({ error }) => {
+        // code 42P01 = relation does not exist; any other result means it's there
+        setCacheTableExists(!error || error.code !== '42P01');
+      });
+  }, []);
 
   const handleRetry = () => { if (user) fetchCollection(user.id); };
 
@@ -638,32 +652,34 @@ export default function Profile() {
           </Card>
         )}
 
-        {/* ── Shared card cache ── */}
-        <Card className="border-border">
-          <CardHeader>
-            <CardTitle className="text-base">Shared Card Cache</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Run this SQL once to enable a shared cache table in Supabase. Once active, card detail
-              pages load from Supabase (~80 ms) instead of the Pokémon TCG API (~400 ms) for any card
-              that has already been looked up by any user — reducing API usage as the app scales.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              The app works without this table — it simply falls back to direct API calls. No images
-              are stored; only lightweight JSON metadata is cached.
-            </p>
-            <CopyBlock id="sql-cache-text" sql={SQL_CACHE_TABLE} />
-            <a
-              href="https://supabase.com/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-            >
-              Open Supabase Dashboard <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </CardContent>
-        </Card>
+        {/* ── Shared card cache — only shown when the table doesn't exist yet ── */}
+        {cacheTableExists === false && (
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-base">Shared Card Cache</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Run this SQL once to enable a shared cache table in Supabase. Once active, card detail
+                pages load from Supabase (~80 ms) instead of the Pokémon TCG API (~400 ms) for any card
+                that has already been looked up by any user — reducing API usage as the app scales.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The app works without this table — it simply falls back to direct API calls. No images
+                are stored; only lightweight JSON metadata is cached.
+              </p>
+              <CopyBlock id="sql-cache-text" sql={SQL_CACHE_TABLE} />
+              <a
+                href="https://supabase.com/dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+              >
+                Open Supabase Dashboard <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <ImportDialog
