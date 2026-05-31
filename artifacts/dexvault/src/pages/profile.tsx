@@ -24,7 +24,7 @@ import {
   ImportMode,
 } from '@/utils/backup';
 
-// ─── SQL snippets shown to users who need to set up their DB ─────────────
+// ─── SQL snippets ──────────────────────────────────────────────────────────
 
 const SQL_SCHEMA = `-- Step 1: Create the collection_cards table
 create table if not exists collection_cards (
@@ -76,6 +76,14 @@ create policy "card_cache_auth_write"   on card_cache for insert
 create policy "card_cache_auth_update"  on card_cache for update
   using (auth.role() = 'authenticated');`;
 
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+/** Re-authenticates with the supplied password. Returns true if correct. */
+async function verifyPassword(email: string, password: string): Promise<boolean> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  return !error;
+}
+
 // ─── CopyBlock ─────────────────────────────────────────────────────────────
 
 function CopyBlock({ id, sql }: { id: string; sql: string }) {
@@ -121,10 +129,10 @@ function CopyBlock({ id, sql }: { id: string; sql: string }) {
 // ─── Import confirmation dialog ────────────────────────────────────────────
 
 interface ImportDialogProps {
-  backup:    CollectionBackup | null;
-  onChoose:  (mode: ImportMode) => void;
-  onCancel:  () => void;
-  loading:   boolean;
+  backup:   CollectionBackup | null;
+  onChoose: (mode: ImportMode) => void;
+  onCancel: () => void;
+  loading:  boolean;
 }
 
 function ImportDialog({ backup, onChoose, onCancel, loading }: ImportDialogProps) {
@@ -169,9 +177,7 @@ function ImportDialog({ backup, onChoose, onCancel, loading }: ImportDialogProps
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onCancel} disabled={loading}>
-            Cancel
-          </Button>
+          <Button variant="ghost" onClick={onCancel} disabled={loading}>Cancel</Button>
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -184,69 +190,126 @@ function ImportDialog({ backup, onChoose, onCancel, loading }: ImportDialogProps
   );
 }
 
-// ─── Inline editable field ─────────────────────────────────────────────────
+// ─── Inline editable field with password confirmation ─────────────────────
 
 interface EditableFieldProps {
-  label:       string;
-  value:       string;
-  type?:       'text' | 'email';
+  label:        string;
+  value:        string;
+  userEmail:    string;
+  type?:        'text' | 'email';
   placeholder?: string;
-  note?:       string;
-  onSave:      (value: string) => Promise<void>;
+  note?:        string;
+  onSave:       (value: string) => Promise<void>;
 }
 
-function EditableField({ label, value, type = 'text', placeholder, note, onSave }: EditableFieldProps) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState('');
-  const [saving, setSaving]   = useState(false);
+function EditableField({ label, value, userEmail, type = 'text', placeholder, note, onSave }: EditableFieldProps) {
+  const [editing,  setEditing]  = useState(false);
+  const [draft,    setDraft]    = useState('');
+  const [password, setPassword] = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const [pwError,  setPwError]  = useState(false);
 
   const startEdit = () => {
     setDraft(value);
+    setPassword('');
+    setPwError(false);
     setEditing(true);
   };
 
   const cancel = () => {
     setEditing(false);
     setDraft('');
+    setPassword('');
+    setPwError(false);
   };
 
   const save = async () => {
     const trimmed = draft.trim();
     if (!trimmed || trimmed === value) { cancel(); return; }
+    if (!password) {
+      setPwError(true);
+      return;
+    }
     setSaving(true);
+    setPwError(false);
     try {
+      const ok = await verifyPassword(userEmail, password);
+      if (!ok) {
+        setPwError(true);
+        toast.error('Incorrect password — change not saved.');
+        return;
+      }
       await onSave(trimmed);
       setEditing(false);
+      setPassword('');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') cancel();
+  };
+
   return (
     <div className="space-y-1">
       <Label className="text-sm font-medium text-muted-foreground">{label}</Label>
+
       {editing ? (
-        <div className="flex items-center gap-2">
-          <Input
-            type={type}
-            value={draft}
-            placeholder={placeholder}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
-            className="h-9 text-sm"
-            autoFocus
-            disabled={saving}
-          />
-          <Button size="sm" className="h-9 px-3 shrink-0" onClick={save} disabled={saving || !draft.trim()}>
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          </Button>
-          <Button size="sm" variant="ghost" className="h-9 px-2 shrink-0" onClick={cancel} disabled={saving}>
-            <X className="w-3.5 h-3.5" />
-          </Button>
+        <div className="rounded-lg border border-border p-3 space-y-2.5 bg-muted/30">
+          {/* New value */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">New {label.toLowerCase()}</Label>
+            <Input
+              type={type}
+              value={draft}
+              placeholder={placeholder}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="h-9 text-sm"
+              autoFocus
+              disabled={saving}
+            />
+          </div>
+
+          {/* Password confirmation */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Current password to confirm</Label>
+            <Input
+              type="password"
+              value={password}
+              placeholder="Enter your current password"
+              onChange={(e) => { setPassword(e.target.value); setPwError(false); }}
+              onKeyDown={handleKeyDown}
+              className={`h-9 text-sm ${pwError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+              disabled={saving}
+            />
+            {pwError && (
+              <p className="text-xs text-destructive">Incorrect password.</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 pt-0.5">
+            <Button
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={save}
+              disabled={saving || !draft.trim() || !password}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8" onClick={cancel} disabled={saving}>
+              <X className="w-3.5 h-3.5 mr-1" />Cancel
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="flex items-center gap-2 group">
-          <p className="text-base">{value || <span className="text-muted-foreground italic">Not set</span>}</p>
+          <p className="text-base">
+            {value || <span className="text-muted-foreground italic">Not set</span>}
+          </p>
           <Button
             variant="ghost"
             size="sm"
@@ -258,36 +321,56 @@ function EditableField({ label, value, type = 'text', placeholder, note, onSave 
           </Button>
         </div>
       )}
-      {note && <p className="text-xs text-muted-foreground">{note}</p>}
+
+      {note && !editing && <p className="text-xs text-muted-foreground">{note}</p>}
     </div>
   );
 }
 
-// ─── Password change section ───────────────────────────────────────────────
+// ─── Password change section with current password confirmation ────────────
 
-function PasswordSection() {
-  const [open, setOpen]           = useState(false);
-  const [newPassword, setNew]     = useState('');
+interface PasswordSectionProps {
+  userEmail: string;
+}
+
+function PasswordSection({ userEmail }: PasswordSectionProps) {
+  const [open,            setOpen]    = useState(false);
+  const [newPassword,     setNew]     = useState('');
   const [confirmPassword, setConfirm] = useState('');
-  const [saving, setSaving]       = useState(false);
+  const [currentPassword, setCurrent] = useState('');
+  const [saving,          setSaving]  = useState(false);
+  const [pwError,         setPwError] = useState(false);
 
   const cancel = () => {
     setOpen(false);
     setNew('');
     setConfirm('');
+    setCurrent('');
+    setPwError(false);
   };
 
   const save = async () => {
     if (newPassword.length < 8) {
-      toast.error('Password must be at least 8 characters.');
+      toast.error('New password must be at least 8 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error('Passwords do not match.');
+      toast.error('New passwords do not match.');
+      return;
+    }
+    if (!currentPassword) {
+      setPwError(true);
       return;
     }
     setSaving(true);
+    setPwError(false);
     try {
+      const ok = await verifyPassword(userEmail, currentPassword);
+      if (!ok) {
+        setPwError(true);
+        toast.error('Incorrect current password — password not changed.');
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) {
         toast.error('Could not update password', { description: error.message });
@@ -309,8 +392,9 @@ function PasswordSection() {
   }
 
   return (
-    <div className="rounded-lg border border-border p-4 space-y-3">
+    <div className="rounded-lg border border-border p-4 space-y-3 bg-muted/30">
       <p className="text-sm font-medium">Change Password</p>
+
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">New password</Label>
         <Input
@@ -323,6 +407,7 @@ function PasswordSection() {
           autoFocus
         />
       </div>
+
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Confirm new password</Label>
         <Input
@@ -332,18 +417,32 @@ function PasswordSection() {
           placeholder="Repeat new password"
           className="h-9 text-sm"
           disabled={saving}
-          onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
         />
       </div>
+
+      <div className="border-t border-border pt-3 space-y-2">
+        <Label className="text-xs text-muted-foreground">Current password to confirm</Label>
+        <Input
+          type="password"
+          value={currentPassword}
+          onChange={(e) => { setCurrent(e.target.value); setPwError(false); }}
+          placeholder="Enter your current password"
+          className={`h-9 text-sm ${pwError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+          disabled={saving}
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+        />
+        {pwError && <p className="text-xs text-destructive">Incorrect current password.</p>}
+      </div>
+
       <div className="flex gap-2 pt-1">
         <Button
           size="sm"
           onClick={save}
-          disabled={saving || !newPassword || !confirmPassword}
+          disabled={saving || !newPassword || !confirmPassword || !currentPassword}
           className="gap-1.5"
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          Save Password
+          Change Password
         </Button>
         <Button size="sm" variant="ghost" onClick={cancel} disabled={saving}>
           Cancel
@@ -356,33 +455,25 @@ function PasswordSection() {
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 export default function Profile() {
-  const { user, signOut } = useAuth();
-  const { dbSetupRequired, fetchCollection } = useCollectionStore();
+  const { user, signOut }                                    = useAuth();
+  const { dbSetupRequired, fetchCollection }                 = useCollectionStore();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [exporting, setExporting]         = useState(false);
-  const [importing, setImporting]         = useState(false);
-  const [pendingBackup, setPendingBackup] = useState<CollectionBackup | null>(null);
+  const fileInputRef                                          = useRef<HTMLInputElement>(null);
+  const [exporting,    setExporting]                         = useState(false);
+  const [importing,    setImporting]                         = useState(false);
+  const [pendingBackup, setPendingBackup]                    = useState<CollectionBackup | null>(null);
 
-  const handleRetry = () => {
-    if (user) fetchCollection(user.id);
-  };
+  const handleRetry = () => { if (user) fetchCollection(user.id); };
 
   // ── Export ─────────────────────────────────────────────────────────────
   const handleExport = async () => {
     if (!user) return;
     setExporting(true);
-    try {
-      await exportCollection(user.id);
-    } finally {
-      setExporting(false);
-    }
+    try { await exportCollection(user.id); }
+    finally { setExporting(false); }
   };
 
-  const handleImportClick = () => {
-    if (!user) return;
-    fileInputRef.current?.click();
-  };
+  const handleImportClick = () => { if (user) fileInputRef.current?.click(); };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -403,35 +494,22 @@ export default function Profile() {
     setImporting(true);
     try {
       const ok = await importCollection(user.id, pendingBackup, mode);
-      if (ok) {
-        setPendingBackup(null);
-        await fetchCollection(user.id);
-      }
-    } finally {
-      setImporting(false);
-    }
+      if (ok) { setPendingBackup(null); await fetchCollection(user.id); }
+    } finally { setImporting(false); }
   };
 
-  const handleImportCancel = () => {
-    if (!importing) setPendingBackup(null);
-  };
+  const handleImportCancel = () => { if (!importing) setPendingBackup(null); };
 
   // ── Account edits ──────────────────────────────────────────────────────
   const handleSaveDisplayName = async (name: string) => {
     const { error } = await supabase.auth.updateUser({ data: { full_name: name } });
-    if (error) {
-      toast.error('Could not update name', { description: error.message });
-      throw error;
-    }
+    if (error) { toast.error('Could not update name', { description: error.message }); throw error; }
     toast.success('Display name updated.');
   };
 
   const handleSaveEmail = async (email: string) => {
     const { error } = await supabase.auth.updateUser({ email });
-    if (error) {
-      toast.error('Could not update email', { description: error.message });
-      throw error;
-    }
+    if (error) { toast.error('Could not update email', { description: error.message }); throw error; }
     toast.success('Confirmation email sent.', {
       description: 'Check your new address for a confirmation link to complete the change.',
     });
@@ -452,12 +530,15 @@ export default function Profile() {
         <Card className="border-border">
           <CardHeader>
             <CardTitle>Account</CardTitle>
-            <CardDescription>Update your name, email address, or password.</CardDescription>
+            <CardDescription>
+              Changes to your name, email, or password require your current password to confirm.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <EditableField
               label="Display Name"
               value={displayName}
+              userEmail={email}
               placeholder="Your name"
               onSave={handleSaveDisplayName}
             />
@@ -465,6 +546,7 @@ export default function Profile() {
             <EditableField
               label="Email"
               value={email}
+              userEmail={email}
               type="email"
               placeholder="your@email.com"
               note="A confirmation link will be sent to your new email address."
@@ -473,7 +555,7 @@ export default function Profile() {
 
             <div className="space-y-1">
               <Label className="text-sm font-medium text-muted-foreground">Password</Label>
-              <PasswordSection />
+              <PasswordSection userEmail={email} />
             </div>
 
             <div className="pt-2 border-t border-border">
@@ -500,9 +582,7 @@ export default function Profile() {
               onClick={handleExport}
               disabled={exporting || !user}
             >
-              {exporting
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Download className="w-4 h-4" />}
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               Export Collection
             </Button>
 
