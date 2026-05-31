@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -20,10 +20,44 @@ if (Number.isNaN(port) || port <= 0) {
 // BASE PATH (safe for Vercel)
 const basePath = process.env.BASE_PATH || "/";
 
+/**
+ * SPA history-API fallback plugin.
+ *
+ * Vite's built-in htmlFallbackMiddleware relies on the request having an
+ * `Accept: text/html` header, which some proxies (including the Replit dev
+ * proxy) may strip.  This plugin adds a secondary fallback that rewrites any
+ * GET request that has no file extension (i.e. a client-side route like
+ * /collection, /sets/sv8pt5, …) to /index.html, so hard-refreshes always
+ * land on the SPA rather than returning 404.
+ */
+function spaFallback(): Plugin {
+  return {
+    name: 'spa-history-fallback',
+    configureServer(server) {
+      // Return a setup function; Vite calls it AFTER registering its own
+      // internal middlewares, so real assets are still served correctly.
+      return () => {
+        server.middlewares.use((req, _res, next) => {
+          if (req.method !== 'GET' || !req.url) return next();
+          const url = req.url.split('?')[0];
+          const isViteInternal = url.startsWith('/@') || url.startsWith('/node_modules');
+          const isAsset = url.includes('.');
+          if (!isViteInternal && !isAsset) {
+            req.url = '/index.html';
+          }
+          next();
+        });
+      };
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
+  appType: 'spa',
 
   plugins: [
+    spaFallback(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),

@@ -6,6 +6,7 @@ import { useTheme } from './theme-provider';
 import { Button } from './ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { useCollectionStore } from '@/store/collectionStore';
+import { LegendDialog } from '@/components/legend-dialog';
 
 interface LayoutProps {
   children: ReactNode;
@@ -63,7 +64,10 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="pt-4 border-t border-sidebar-border mt-auto">
+        <div className="pt-4 border-t border-sidebar-border mt-auto space-y-1">
+          <div className="flex items-center px-3 py-2">
+            <LegendDialog triggerClassName="flex items-center gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors w-full" />
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -81,15 +85,18 @@ export function Layout({ children }: LayoutProps) {
         {/* Mobile top bar — always black */}
         <header className="md:hidden flex items-center justify-between px-4 h-16 bg-black border-b border-black sticky top-0 z-30">
           <img src="/vault_151_blackbg.png" alt="Vault151" className="h-[52px] w-auto object-contain" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:text-white hover:bg-white/10"
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            data-testid="button-toggle-theme-mobile"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-2">
+            <LegendDialog triggerClassName="flex items-center gap-1 text-white/70 hover:text-white transition-colors" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:text-white hover:bg-white/10"
+              onClick={() => setTheme(isDark ? 'light' : 'dark')}
+              data-testid="button-toggle-theme-mobile"
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+          </div>
         </header>
 
         {dbSetupRequired && (
