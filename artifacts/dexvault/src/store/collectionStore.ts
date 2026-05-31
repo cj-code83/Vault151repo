@@ -57,16 +57,19 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .select('*')
         .eq('user_id', userId)
         .range(from, to);
-
+      
       if (error) {
-        set({ loading: false });
-        if (isTableMissingError(error)) {
-          set({ dbSetupRequired: true });
-        } else {
-          toast.error('Could not load collection', { description: error.message });
-        }
-        return;
-      }
+  console.error('FETCH COLLECTION ERROR:', error);
+
+  set({ loading: false });
+
+  if (isTableMissingError(error)) {
+    set({ dbSetupRequired: true });
+  } else {
+    toast.error('Could not load collection', { description: error.message });
+  }
+  return;
+}
 
       if (data && data.length > 0) {
         allRows.push(...(data as Record<string, unknown>[]));
