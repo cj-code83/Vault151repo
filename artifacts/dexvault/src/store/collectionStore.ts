@@ -23,12 +23,27 @@ interface CollectionState {
   bulkRemoveCards: (cardIds: string[], userId: string) => Promise<void>;
 }
 
-function isTableMissingError(error: { code?: string; message?: string }) {
-  return (
-    error.code === '42P01' ||
-    (error.message ?? '').includes('relation') ||
-    (error.message ?? '').includes('does not exist')
-  );
+/**
+ * Returns true ONLY when PostgreSQL reports the table genuinely does not exist
+ * (error code 42P01 — UNDEFINED_TABLE).
+ *
+ * We intentionally do NOT match on message text such as "relation" or
+ * "does not exist" because those strings also appear in RLS-policy errors
+ * (e.g. "permission denied for relation collection_cards"), auth errors,
+ * and other transient failures — all of which would be false positives.
+ */
+function isTableMissingError(error: { code?: string; message?: string }): boolean {
+  return error.code === '42P01';
+}
+
+/** Structured console error — always includes the calling function name, code, and message. */
+function logError(fn: string, error: { code?: string; message?: string; details?: string; hint?: string }) {
+  console.error(`[collectionStore:${fn}]`, {
+    code:    error.code    ?? '(none)',
+    message: error.message ?? '(none)',
+    details: error.details ?? '(none)',
+    hint:    error.hint    ?? '(none)',
+  });
 }
 
 export const useCollectionStore = create<CollectionState>((set, get) => ({
@@ -59,17 +74,15 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .range(from, to);
       
       if (error) {
-  console.error('FETCH COLLECTION ERROR:', error);
-
-  set({ loading: false });
-
-  if (isTableMissingError(error)) {
-    set({ dbSetupRequired: true });
-  } else {
-    toast.error('Could not load collection', { description: error.message });
-  }
-  return;
-}
+        logError('fetchCollection', error);
+        set({ loading: false });
+        if (isTableMissingError(error)) {
+          set({ dbSetupRequired: true });
+        } else {
+          toast.error('Could not load collection', { description: error.message });
+        }
+        return;
+      }
 
       if (data && data.length > 0) {
         allRows.push(...(data as Record<string, unknown>[]));
@@ -145,6 +158,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       .single();
 
     if (error) {
+      logError('addCard', error);
       set((state) => {
         const next = { ...state.collectionCards };
         delete next[card.id];
@@ -167,6 +181,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
           ...state.collectionCards,
           [card.id]: { ...optimisticCard, id: data.id },
         },
+        dbSetupRequired: false,
       }));
       // Cache card data in Supabase so future collection-tab queries
       // can be served entirely from Supabase without hitting the API.
@@ -266,6 +281,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .single();
 
       if (error) {
+        logError('toggleWishlist', error);
         set((state) => {
           const next = { ...state.collectionCards };
           delete next[cardId];
@@ -285,6 +301,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
             ...state.collectionCards,
             [cardId]: { ...optimisticCard, id: data.id },
           },
+          dbSetupRequired: false,
         }));
       }
       return;
@@ -449,6 +466,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .single();
 
       if (error) {
+        logError('updateVariants', error);
         set((state) => {
           const next = { ...state.collectionCards };
           delete next[cardId];
@@ -468,6 +486,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
             ...state.collectionCards,
             [cardId]: { ...optimistic, id: data.id },
           },
+          dbSetupRequired: false,
         }));
       }
       return;
@@ -537,6 +556,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .select();
 
       if (error) {
+        logError('bulkAddCards', error);
         if (isTableMissingError(error)) set({ dbSetupRequired: true });
         toast.error('Could not add cards', { description: error.message });
         return { added: totalAdded, skipped: cards.length - totalAdded };
@@ -561,11 +581,11 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
       }
     }
 
-    // Optimistic local update
+    // Optimistic local update — also clears any stale dbSetupRequired flag
     set((state) => {
       const next = { ...state.collectionCards };
       for (const cc of allInserted) next[cc.cardId] = cc;
-      return { collectionCards: next };
+      return { collectionCards: next, dbSetupRequired: false };
     });
 
     // Fire-and-forget cache writes
@@ -604,6 +624,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
         .in('card_id', chunk);
 
       if (error) {
+        logError('bulkRemoveCards', error);
         success = false;
         if (isTableMissingError(error)) set({ dbSetupRequired: true });
         toast.error('Could not remove cards', { description: error.message });
